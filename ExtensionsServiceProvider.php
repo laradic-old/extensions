@@ -5,6 +5,7 @@
 namespace Laradic\Extensions;
 
 use Illuminate\Contracts\Foundation\Application;
+use Laradic\Config\Traits\ConfigProviderTrait;
 use Laradic\Support\ServiceProvider;
 
 /**
@@ -18,9 +19,11 @@ use Laradic\Support\ServiceProvider;
  */
 class ExtensionsServiceProvider extends ServiceProvider
 {
-    protected $configFiles = ['laradic_extensions'];
+    use ConfigProviderTrait;
 
-    protected $dir = __DIR__;
+   # protected $configFiles = ['laradic_extensions'];
+
+   # protected $dir = __DIR__;
 
     public function boot()
     {
@@ -44,6 +47,10 @@ class ExtensionsServiceProvider extends ServiceProvider
     public function register()
     {
         parent::register();
+
+
+        $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__.'/resources/config'));
+
 
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
