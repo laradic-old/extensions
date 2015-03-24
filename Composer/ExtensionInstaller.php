@@ -4,6 +4,7 @@
  */
 namespace Laradic\Extensions\Composer;
 
+use Composer\Installer\LibraryInstaller;
 use Composer\Package\PackageInterface;
 
 /**
@@ -15,7 +16,7 @@ use Composer\Package\PackageInterface;
  * @copyright   2011-2015, Robin Radic
  * @link        http://radic.mit-license.org
  */
-class ExtensionInstaller
+class ExtensionInstaller extends LibraryInstaller
 {
 
     /**
