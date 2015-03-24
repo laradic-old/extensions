@@ -22,6 +22,22 @@ class ExtensionsServiceProvider extends ServiceProvider
 
     protected $dir = __DIR__;
 
+    public function boot()
+    {
+        parent::boot();
+
+        /** @var \Illuminate\Foundation\Application $app */
+        $app = $this->app;
+
+        foreach($app->make('extensions')->all() as $extension)
+        {
+            if($extension->isInstalled())
+            {
+                $extension->boot();
+            }
+        }
+    }
+
     /**
  * Instanciates the class
  */
@@ -39,9 +55,18 @@ class ExtensionsServiceProvider extends ServiceProvider
         });
 
         $app->singleton('extensions', function(Application $app){
-            return new ExtensionCollection($app, $app->make('files'), $app->make('extensions.finder'));
+            return new ExtensionCollection($app, $app->make('files'), $app->make('extensions.finder'), $app->make('db')->connection());
         });
 
         $app->make('extensions')->locateAndRegisterAll()->sortByDependencies();
+
+        if($app->runningInConsole())
+        {
+            $app->register('Laradic\Extensions\Providers\ConsoleServiceProvider');
+        }
+
+        $this->publishes([
+            __DIR__.'/resources/migrations/' => base_path('/database/migrations')
+        ], 'migrations');
     }
 }

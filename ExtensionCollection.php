@@ -5,6 +5,7 @@
 namespace Laradic\Extensions;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Connection;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
@@ -18,6 +19,8 @@ use Laradic\Support\Sorter;
  * @license     MIT
  * @copyright   2011-2015, Robin Radic
  * @link        http://radic.mit-license.org
+ * @method Extension[] all
+ * @method Extension get(string $slug)
  */
 class ExtensionCollection extends Collection implements ExtensionsContract
 {
@@ -28,16 +31,22 @@ class ExtensionCollection extends Collection implements ExtensionsContract
 
     protected $app;
 
-    protected $extensions = [];
+    protected $connection;
 
     /**
      * Instanciates the class
      */
-    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder)
+    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, Connection $connection)
     {
-        $this->app    = $app;
-        $this->files  = $files;
-        $this->finder = $finder;
+        $this->connection = $connection;
+        $this->app        = $app;
+        $this->files      = $files;
+        $this->finder     = $finder;
+    }
+
+    public function addPath($path)
+    {
+        $this->finder->addPath($path);
     }
 
     public function createFromFile($extensionFilePath)
@@ -69,12 +78,12 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         return $this;
     }
 
+
     public function sortByDependencies()
     {
         $sorter = new Sorter();
         foreach ($this->all() as $extension)
         {
-            /** @var \Laradic\Extensions\Extension $extension */
             $sorter->addItem($extension->getSlug(), $extension->getDependencies());
         }
         $extensions = [];
@@ -86,6 +95,17 @@ class ExtensionCollection extends Collection implements ExtensionsContract
 
         return $this;
     }
+
+    /**
+     * Get the value of connection
+     *
+     * @return \Illuminate\Database\Connection
+     */
+    public function getConnection()
+    {
+        return $this->connection;
+    }
+
 
     /**
      * Get the value of finder

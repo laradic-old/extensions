@@ -5,6 +5,7 @@
 namespace Laradic\Extensions;
 
 use Laradic\Extensions\Contracts\Extension as ExtensionContract;
+use Laradic\Support\Traits\EventDispatcherTrait;
 
 /**
  * Class Extension
@@ -17,6 +18,7 @@ use Laradic\Extensions\Contracts\Extension as ExtensionContract;
  */
 class Extension implements ExtensionContract
 {
+    use EventDispatcherTrait;
 
     protected $extensions;
 
@@ -30,6 +32,8 @@ class Extension implements ExtensionContract
 
     protected $path;
 
+    protected $record;
+
     /**
      * Instanciates the class
      */
@@ -41,23 +45,78 @@ class Extension implements ExtensionContract
         $this->slug         = $properties['slug'];
         $this->dependencies = $properties['dependencies'];
         $this->name         = $properties['name'];
+
+        if ( ! $this->record = $this->getDatabaseRecord() )
+        {
+            $this->insertDatabaseRecord();
+        }
+    }
+
+    public function queryDatabase()
+    {
+        return $this->extensions->getConnection()->table('extensions');
+    }
+
+    public function getDatabaseRecord()
+    {
+        return (array) $this->queryDatabase()->where('slug', $this->slug)->first();
+    }
+
+    public function insertDatabaseRecord()
+    {
+        $this->queryDatabase()->insert([
+            'slug'      => $this->slug,
+            'installed' => false
+        ]);
+    }
+
+    public function install()
+    {
+        $this->fireEvent('extension.installing', [$this]);
+        $this->callPropertiesClosure('install');
+        $this->queryDatabase()->where('slug', $this->slug)->update(['installed' => true]);
+        $this->fireEvent('extension.installed', [$this]);
+    }
+
+    public function uninstall()
+    {
+        $this->fireEvent('extension.uninstalling', [$this]);
+        $this->callPropertiesClosure('uninstall');
+        $this->queryDatabase()->where('slug', $this->slug)->update(['installed' => false]);
+        $this->fireEvent('extension.uninstalled', [$this]);
+    }
+
+    public function isInstalled()
+    {
+        return (bool)$this->record['installed'];
+    }
+
+    protected function callPropertiesClosure($name)
+    {
+        if ( $this->properties[$name] instanceof \Closure )
+        {
+            $this->properties[$name]($this->extensions->getApplication(), $this, $this->extensions);
+        }
     }
 
     public function register()
     {
-        if ( $this->properties['register'] instanceof \Closure )
-        {
-            $this->properties['register']($this->extensions->getApplication(), $this, $this->extensions);
-        }
+        $this->fireEvent('extension.register', [$this]);
+        $this->callPropertiesClosure('register');
+        $this->fireEvent('extension.registered', [$this]);
     }
 
     public function boot()
     {
-        if ( $this->properties['boot'] instanceof \Closure )
+        if(!$this->isInstalled())
         {
-            $this->properties['boot']($this->extensions->getApplication(), $this, $this->extensions);
+            return;
         }
+        $this->fireEvent('extension.booting', [$this]);
+        $this->callPropertiesClosure('boot');
+        $this->fireEvent('extension.booted', [$this]);
     }
+
 
     /**
      * Get the value of path
