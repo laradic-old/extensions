@@ -1,5 +1,6 @@
 {
     "name": "laradic/extensions",
+    "type": "composer-plugin",
     "description": "Laravel package providing additional Blade extensions: foreach (with $loop data like twig), break, continue, set,array (multiline), etc",
     "homepage": "https://github.com/RobinRadic/blade-extensions",
     "keywords": [
@@ -20,8 +21,8 @@
     "prefer-stable": true,
     "require": {
         "php": ">=5.4.0",
-        "illuminate/support": "~5.0",
-        "laradic/support": "~1.0"
+        "laradic/support": "~1.0",
+        "composer-plugin-api": "1.0.0"
     },
     "suggest": {
         "raveren/kint": ">0.9.1",
@@ -30,16 +31,22 @@
     },
     "require-dev": {
         "laradic/dev": "dev-master",
-        "raveren/kint": "0.9.*",
-        "illuminate/html": "~5.0",
-        "erusev/parsedown": "~1.5",
-        "kzykhys/ciconia": "1.0.*"
+        "raveren/kint": "0.9.*"
     },
     "scripts": {
     },
     "autoload": {
         "psr-4": {
             "Laradic\\Extensions\\": ""
+        }
+    },
+    "extra": {
+        "component": "package",
+        "class": [
+            "Laradic\\Extensions\\Composer\\ExtensionInstallerPlugin"
+        ],
+        "branch-alias": {
+            "dev-master": "1.2-dev"
         }
     }
 }
