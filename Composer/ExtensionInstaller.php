@@ -30,6 +30,7 @@ class ExtensionInstaller extends LibraryInstaller
         return __DIR__.'/../../../extensions/'.$package->getPrettyName();
     }
 
+
     /**
      * supports
      *
