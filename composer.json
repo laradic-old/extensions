@@ -33,7 +33,6 @@
         }
     },
     "extra": {
-        "component": "package",
         "class": [
             "Laradic\\Extensions\\Composer\\ExtensionInstallerPlugin"
         ]
