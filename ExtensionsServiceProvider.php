@@ -57,7 +57,7 @@ class ExtensionsServiceProvider extends ServiceProvider
 
         $app->bind('extensions.finder', function(Application $app){
             $finder = new ExtensionFileFinder($app->make('files'));
-            $finder->addPath($app->make('config')->get('laradic_extensions.paths'));
+            $finder->addPath($app->make('config')->get('laradic/extensions::paths'));
             return $finder;
         });
 
