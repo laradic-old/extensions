@@ -101,6 +101,10 @@ class Extension implements ExtensionContract
 
     public function register()
     {
+        if(!$this->isInstalled())
+        {
+            return;
+        }
         $this->fireEvent('extension.register', [$this]);
         $this->callPropertiesClosure('register');
         $this->fireEvent('extension.registered', [$this]);
