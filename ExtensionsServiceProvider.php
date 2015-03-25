@@ -27,10 +27,8 @@ class ExtensionsServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        parent::boot();
-
         /** @var \Illuminate\Foundation\Application $app */
-        $app = $this->app;
+        $app = parent::boot();
 
         foreach($app->make('extensions')->all() as $extension)
         {
@@ -46,15 +44,16 @@ class ExtensionsServiceProvider extends ServiceProvider
  */
     public function register()
     {
-        parent::register();
-
+        /** @var \Illuminate\Foundation\Application $app */
+        $app = parent::register();
 
         $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__.'/resources/config'));
 
+        $this->publishes([
+            __DIR__.'/resources/migrations/' => base_path('/database/migrations')
+        ], 'migrations');
 
-        /** @var \Illuminate\Foundation\Application $app */
-        $app = $this->app;
-
+        
         $app->bind('extensions.finder', function(Application $app){
             $finder = new ExtensionFileFinder($app->make('files'));
             $finder->addPath($app->make('config')->get('laradic/extensions::paths'));
@@ -72,8 +71,5 @@ class ExtensionsServiceProvider extends ServiceProvider
             $app->register('Laradic\Extensions\Providers\ConsoleServiceProvider');
         }
 
-        $this->publishes([
-            __DIR__.'/resources/migrations/' => base_path('/database/migrations')
-        ], 'migrations');
     }
 }
