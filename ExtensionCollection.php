@@ -60,7 +60,13 @@ class ExtensionCollection extends Collection implements ExtensionsContract
     {
         foreach ($this->finder->findAll() as $extensionFilePath)
         {
-            $this->register($extensionFilePath);
+            $extension = $this->createFromFile($extensionFilePath);
+            $this->put($extension->getSlug(), $extension);
+        }
+
+        foreach($this->sortByDependencies()->all() as $extension)
+        {
+            $this->register($extension);
         }
 
         return $this;
@@ -68,12 +74,16 @@ class ExtensionCollection extends Collection implements ExtensionsContract
 
     public function register($extension)
     {
-        if ( ! $extension instanceof Extension )
+
+        if ( ! $this->has($extension) and ! $extension instanceof Extension )
         {
             $extension = $this->createFromFile($extension);
         }
+        elseif(! $extension instanceof Extension)
+        {
+            $extension = $this->get($extension);
+        }
         $extension->register();
-        $this->put($extension->getSlug(), $extension);
 
         return $this;
     }
@@ -87,12 +97,14 @@ class ExtensionCollection extends Collection implements ExtensionsContract
             $sorter->addItem($extension->getSlug(), $extension->getDependencies());
         }
         $extensions = [];
-        foreach ($sorter->sort() as $slug)
+        $sorted     = $sorter->sort();
+        foreach ($sorted as $slug)
         {
             $extensions[$slug] = $this->get($slug);
         }
         $this->items = $extensions;
 
+        #Debugger::log('deps', $this->items, $sorted, array_reverse($sorted));
         return $this;
     }
 
