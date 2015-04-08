@@ -36,6 +36,10 @@ class Extension implements ExtensionContract
 
     /**
      * Instanciates the class
+     *
+     * @param \Laradic\Extensions\ExtensionCollection $extensions
+     * @param                                         $path
+     * @param array                                   $properties
      */
     public function __construct(ExtensionCollection $extensions, $path, array $properties)
     {
@@ -59,7 +63,7 @@ class Extension implements ExtensionContract
 
     public function getDatabaseRecord()
     {
-        return (array) $this->queryDatabase()->where('slug', $this->slug)->first();
+        return (array)$this->queryDatabase()->where('slug', $this->slug)->first();
     }
 
     public function insertDatabaseRecord()
@@ -81,6 +85,13 @@ class Extension implements ExtensionContract
     public function uninstall()
     {
         $this->fireEvent('extension.uninstalling', [$this]);
+        // Check if there are extensions installed that rely on this one
+        if ( ! $this->canUninstall() )
+        {
+            // Cancel the uninstallation
+            return false;
+        }
+
         $this->callPropertiesClosure('uninstall');
         $this->queryDatabase()->where('slug', $this->slug)->update(['installed' => false]);
         $this->fireEvent('extension.uninstalled', [$this]);
@@ -101,7 +112,7 @@ class Extension implements ExtensionContract
 
     public function register()
     {
-        if(!$this->isInstalled())
+        if ( ! $this->isInstalled() )
         {
             return;
         }
@@ -112,13 +123,48 @@ class Extension implements ExtensionContract
 
     public function boot()
     {
-        if(!$this->isInstalled())
+        if ( ! $this->isInstalled() )
         {
             return;
         }
         $this->fireEvent('extension.booting', [$this]);
         $this->callPropertiesClosure('boot');
         $this->fireEvent('extension.booted', [$this]);
+    }
+
+
+    public function getDependants()
+    {
+        $deps = [];
+        foreach ($this->extensions->all() as $e)
+        {
+            if ( in_array($this->slug, $e->getDependencies()) )
+            {
+                $deps[] = $e->getSlug();
+            }
+        }
+
+        return $deps;
+    }
+
+    public function getInstalledDependants()
+    {
+        $installedDeps = [];
+        foreach ($this->getDependants() as $dep)
+        {
+            $ex = $this->extensions->get($dep);
+            if ( $ex->isInstalled() )
+            {
+                $installedDeps[] = $ex->getSlug();
+            }
+        }
+
+        return $installedDeps;
+    }
+
+    public function canUninstall()
+    {
+        return empty($this->getInstalledDependants());
     }
 
 

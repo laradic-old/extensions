@@ -35,6 +35,11 @@ class ExtensionCollection extends Collection implements ExtensionsContract
 
     /**
      * Instanciates the class
+     *
+     * @param \Illuminate\Contracts\Foundation\Application $app
+     * @param \Illuminate\Filesystem\Filesystem            $files
+     * @param \Laradic\Extensions\ExtensionFileFinder      $finder
+     * @param \Illuminate\Database\Connection              $connection
      */
     public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, Connection $connection)
     {
@@ -43,7 +48,6 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         $this->files      = $files;
         $this->finder     = $finder;
     }
-
     public function addPath($path)
     {
         $this->finder->addPath($path);
@@ -64,7 +68,7 @@ class ExtensionCollection extends Collection implements ExtensionsContract
             $this->put($extension->getSlug(), $extension);
         }
 
-        foreach($this->sortByDependencies()->all() as $extension)
+        foreach ($this->sortByDependencies()->all() as $extension)
         {
             $this->register($extension);
         }
@@ -79,7 +83,7 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         {
             $extension = $this->createFromFile($extension);
         }
-        elseif(! $extension instanceof Extension)
+        elseif ( ! $extension instanceof Extension )
         {
             $extension = $this->get($extension);
         }
