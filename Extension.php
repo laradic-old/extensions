@@ -97,6 +97,18 @@ class Extension implements ExtensionContract
         $this->fireEvent('extension.uninstalled', [$this]);
     }
 
+    public function canInstall()
+    {
+        foreach($this->getDependencies() as $dep)
+        {
+            if(!$this->extensions->isInstalled($dep))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
     public function isInstalled()
     {
         return (bool)$this->record['installed'];

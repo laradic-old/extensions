@@ -48,6 +48,28 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         $this->files      = $files;
         $this->finder     = $finder;
     }
+
+    /**
+     * get
+     *
+     * @param mixed $slug
+     * @return Extension
+     */
+    public function get($slug)
+    {
+        return parent::get($slug);
+    }
+
+    public function isInstalled($slug)
+    {
+        if ( ! $this->has($slug) )
+        {
+            return false;
+        }
+
+        return $this->get($slug)->isInstalled();
+    }
+
     public function addPath($path)
     {
         $this->finder->addPath($path);
