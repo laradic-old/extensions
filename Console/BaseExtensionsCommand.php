@@ -6,6 +6,7 @@ namespace Laradic\Extensions\Console;
 
 use Laradic\Support\AbstractConsoleCommand;
 use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\VarDumper\VarDumper;
 
 /**
  * Class CreateExtensionCommand
@@ -18,7 +19,8 @@ use Symfony\Component\Console\Input\InputArgument;
  */
 abstract class BaseExtensionsCommand extends AbstractConsoleCommand
 {
-    /** @var \Laradic\Extensions\ExtensionCollection  */
+
+    /** @var \Laradic\Extensions\ExtensionCollection */
     protected $extensions;
 
     /**
@@ -43,6 +45,7 @@ abstract class BaseExtensionsCommand extends AbstractConsoleCommand
         {
             return false;
         }
+
         return true;
     }
 
@@ -54,8 +57,39 @@ abstract class BaseExtensionsCommand extends AbstractConsoleCommand
      */
     protected function getSlugVendorAndPackage($slug)
     {
-        preg_match('/([a-z]*)\/([a-z]*)/', $slug, $matches);
+        preg_match('/([a-z\-]*)\/([a-z\-]*)/', $slug, $matches);
+
         return array_slice($matches, 1, 2);
     }
 
+    protected function convertSlugToClassName($slug)
+    {
+        if ( $this->validateSlug($slug) )
+        {
+            list($vendor, $package) = $this->getSlugVendorAndPackage($slug);
+
+            return $this->convertSlugToClassName($vendor) . '\\' . $this->convertSlugToClassName($package);
+        }
+        else
+        {
+            $className = '';
+            if ( stristr($slug, '-') !== false )
+            {
+                $slugs = preg_split('/\-/', $slug);
+            }
+            else
+            {
+                $slugs = [$slug];
+            }
+
+           # VarDumper::dump($slugs);
+
+            foreach ($slugs as $_slug)
+            {
+                $className .= ucfirst($_slug);
+            }
+
+            return $className;
+        }
+    }
 }

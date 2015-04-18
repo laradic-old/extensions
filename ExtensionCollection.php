@@ -1,6 +1,12 @@
 <?php
 /**
- * Part of the Radic packages.
+ * Part of the Laradic packages.
+ * MIT License and copyright information bundled with this package in the LICENSE file.
+ *
+ * @author      Robin Radic
+ * @license     MIT
+ * @copyright   2011-2015, Robin Radic
+ * @link        http://radic.mit-license.org
  */
 namespace Laradic\Extensions;
 
@@ -13,25 +19,23 @@ use Laradic\Support\Sorter;
 use Laradic\Support\TemplateParser;
 
 /**
- * Class Repository
+ * Class ExtensionCollection
  *
  * @package     Laradic\Extensions
- * @author      Robin Radic
- * @license     MIT
- * @copyright   2011-2015, Robin Radic
- * @link        http://radic.mit-license.org
  * @method Extension[] all
- * @method Extension get(string $slug)
  */
 class ExtensionCollection extends Collection implements ExtensionsContract
 {
-
+    /** @var \Illuminate\Filesystem\Filesystem */
     protected $files;
 
+    /** @var \Laradic\Extensions\ExtensionFileFinder  */
     protected $finder;
 
+    /** @var \Illuminate\Foundation\Application  */
     protected $app;
 
+    /** @var \Illuminate\Database\Connection  */
     protected $connection;
 
     /**
@@ -53,7 +57,7 @@ class ExtensionCollection extends Collection implements ExtensionsContract
     /**
      * get
      *
-     * @param mixed $slug
+     * @param string $slug
      * @return Extension
      */
     public function get($slug)
@@ -73,6 +77,12 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         return new TemplateParser($this->app->make('files'), $sourcePath);
     }
 
+    /**
+     * Checks if an extension is installed
+     *
+     * @param $slug
+     * @return bool
+     */
     public function isInstalled($slug)
     {
         if ( ! $this->has($slug) )
@@ -83,11 +93,23 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         return $this->get($slug)->isInstalled();
     }
 
+    /**
+     * Adds a path to include while searching for extensions
+     *
+     * @param string $path The absolute path to the directory
+     */
     public function addPath($path)
     {
         $this->finder->addPath($path);
     }
 
+    /**
+     * Creates an extension instance using the extension.php file
+     *
+     * @param string $extensionFilePath Path to the extension.php file
+     * @return \Laradic\Extensions\Extension
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
     public function createFromFile($extensionFilePath)
     {
         $properties = $this->files->getRequire($extensionFilePath);
@@ -95,6 +117,11 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         return new Extension($this, dirname($extensionFilePath), $properties);
     }
 
+    /**
+     * Finds all extensions and registers them
+     *
+     * @return $this
+     */
     public function locateAndRegisterAll()
     {
         foreach ($this->finder->findAll() as $extensionFilePath)
@@ -111,6 +138,12 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         return $this;
     }
 
+    /**
+     * register
+     *
+     * @param Extension|string $extension An Extension instance or extension slug
+     * @return $this
+     */
     public function register($extension)
     {
 
@@ -118,7 +151,7 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         {
             $extension = $this->createFromFile($extension);
         }
-        elseif ( ! $extension instanceof Extension )
+        elseif ( ! $extension instanceof Extension and $this->has($extension) )
         {
             $extension = $this->get($extension);
         }
@@ -127,7 +160,11 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         return $this;
     }
 
-
+    /**
+     * Sorts all registered extensions by dependency
+     *
+     * @return $this
+     */
     public function sortByDependencies()
     {
         $sorter = new Sorter();

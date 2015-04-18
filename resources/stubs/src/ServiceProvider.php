@@ -19,6 +19,11 @@ class {packageName}ServiceProvider extends ServiceProvider
 {
 
     use ConfigProviderTrait, ThemeProviderTrait;
+
+    protected $providers = [
+        '{namespace}\Providers\RouteServiceProvider',
+
+    ];
     public function boot()
     {
         /** @var \Illuminate\Foundation\Application $app */
@@ -31,5 +36,10 @@ class {packageName}ServiceProvider extends ServiceProvider
         /** @var \Illuminate\Foundation\Application $app */
         $app = parent::register();
         $this->addConfigComponent('{vendor}/{package}', '{vendor}/{package}', realpath(__DIR__.'/../resources/config'));
+
+        if($app->runningInConsole())
+        {
+            $app->register('{namespace}\Console\ConsoleServiceProvider');
+        }
     }
 }
