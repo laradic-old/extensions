@@ -10,6 +10,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
 use Laradic\Support\Sorter;
+use Laradic\Support\TemplateParser;
 
 /**
  * Class Repository
@@ -58,6 +59,18 @@ class ExtensionCollection extends Collection implements ExtensionsContract
     public function get($slug)
     {
         return parent::get($slug);
+    }
+
+    /**
+     * getTemplateParser
+     *
+     * @param null $sourcePath
+     * @return \Laradic\Support\TemplateParser
+     */
+    public function getTemplateParser($sourcePath = null)
+    {
+        $sourcePath = is_null($sourcePath) ? realpath(__DIR__ . '/resources/stubs') : $sourcePath;
+        return new TemplateParser($this->app->make('files'), $sourcePath);
     }
 
     public function isInstalled($slug)

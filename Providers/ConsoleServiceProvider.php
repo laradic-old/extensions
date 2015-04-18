@@ -4,8 +4,7 @@
  */
 namespace Laradic\Extensions\Providers;
 
-use Illuminate\Contracts\Foundation\Application;
-use Laradic\Support\ServiceProvider;
+use Laradic\Support\AbstractConsoleProvider;
 
 /**
  * Class ConsoleServiceProvider
@@ -16,34 +15,22 @@ use Laradic\Support\ServiceProvider;
  * @copyright   2011-2015, Robin Radic
  * @link        http://radic.mit-license.org
  */
-class ConsoleServiceProvider extends ServiceProvider
+class ConsoleServiceProvider extends AbstractConsoleProvider
 {
 
+    /**
+     * The namespace where the commands are
+     *
+     * @var string
+     */
+    protected $namespace = 'Laradic\Extensions\Console';
+
     protected $commands = [
-        'command.extensions.list' => 'ListExtensionsCommand',
-        'command.extensions.install' => 'InstallExtensionsCommand',
-        'command.extensions.uninstall' => 'UninstallExtensionsCommand'
+        'ListExtensions' => 'command.extensions.list',
+        'InstallExtensions' => 'command.extensions.install',
+        'UninstallExtensions' => 'command.extensions.uninstall',
+        'CreateExtension' => 'command.extensions.create'
     ];
 
-    public function register()
-    {
-        parent::register();
-        /** @var \Illuminate\Contracts\Foundation\Application $app */
-        $app = $this->app;
 
-        foreach ($this->commands as $abstract => $class)
-        {
-            $class = "Laradic\\Extensions\\Console\\$class";
-            $app->singleton($abstract, function (Application $app) use ($class)
-            {
-                return new $class();
-            });
-        }
-        $this->commands(array_keys($this->commands));
-    }
-
-    public function provides()
-    {
-        return array_keys($this->commands);
-    }
 }
