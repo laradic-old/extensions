@@ -10,7 +10,9 @@
  */
 namespace Laradic\Extensions\Console;
 
+use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
 use Illuminate\Filesystem\Filesystem;
+use Laradic\Support\AbstractConsoleCommand;
 use Laradic\Support\Path;
 use Symfony\Component\Console\Input\InputArgument;
 
@@ -19,24 +21,30 @@ use Symfony\Component\Console\Input\InputArgument;
  *
  * @package     Laradic\Extensions\Console
  */
-class CreateExtensionCommand extends BaseExtensionsCommand
+class CreateExtensionCommand extends AbstractConsoleCommand
 {
+
+    use ExtensionCommandTrait;
 
     protected $name = 'extensions:create';
 
     protected $description = 'Create an extensions.';
 
-    protected $createDirs = [
-        'src',
-        'resources', 'resources/config',
-        'resources/theme', 'resources/theme/views'
-    ];
 
-    protected $copyFiles = [
-        'extension.php', 'composer.json',
-        'resources/config/config.php','resources/theme/views/index.blade.php',
-        'src/ServiceProvider.php'
-    ];
+    public function fire2()
+    {
+        $slug = $this->argument('slug');
+        $path = $this->argument('path');
+
+        if ( ! $this->validateSlug($slug) )
+        {
+            return $this->error("Extension slug [$slug] is not valid");
+        }
+
+        $this->createExtensionMigration($slug);
+        #$attr = $this->getExtension($slug)->getAttributes();
+        #$this->dump($this->getExtension($slug)->getPath('migrations'));
+    }
 
     public function fire()
     {
@@ -48,13 +56,12 @@ class CreateExtensionCommand extends BaseExtensionsCommand
             return $this->error("Extension slug [$slug] is not valid");
         }
 
-        /** @var \Illuminate\Filesystem\Filesystem $files */
-        $files = $this->getLaravel()->make('files');
+        $files = $this->getFiles();
         $extensions = $this->getExtensions();
 
         list($vendor, $package) = $this->getSlugVendorAndPackage($slug);
-        $packageName = $this->convertSlugToClassName($package);
-        $vendorName = $this->convertSlugToClassName($vendor);
+        $packageName = studly_case($package);
+        $vendorName = studly_case($vendor);
         $namespace = $vendorName . '\\' . $packageName;
         $autoloadPsr4 = $vendorName . '\\\\' . $packageName . '\\\\';
 
@@ -64,33 +71,26 @@ class CreateExtensionCommand extends BaseExtensionsCommand
         $parser = $extensions->getTemplateParser();
         $vars = compact('vendor', 'package', 'packageName', 'basePath', 'path', 'namespace', 'autoloadPsr4');
         $parser->setVar($vars);
-        #$this->dump($vars);
 
-        #$this->createDirStructure($files, $path);
         $files->deleteDirectory($path);
         $parser->setSourceDir(Path::join(__DIR__, '../resources/stubs'));
         $parser->copyDirectory($path);
+
         $renameFiles = [
             "src/ServiceProvider.php" => "src/{$packageName}ServiceProvider.php",
             "src/Http/Controllers/Controller.php" => "src/Http/Controllers/{$packageName}Controller.php"
         ];
+
         foreach($renameFiles as $renameFromPath => $renameToPath)
         {
             $files->move(Path::join($path, $renameFromPath), Path::join($path, $renameToPath));
         }
-        #$parser->copy($this->copyFiles, $path);
-        #$files->move(Path::join($path, 'src/ServiceProvider.php'), Path::join($path, "src/{$packageName}ServiceProvider.php"));
+
+        $this->createExtensionMigration($slug);
+
         $this->info("Extension [${vendor}/${namespace}] created");
     }
 
-    protected function createDirStructure(Filesystem $files, $path)
-    {
-        $files->deleteDirectory($path);
-        foreach($this->createDirs as $dir)
-        {
-            #$files->makeDirectory(Path::join($path, $dir), 0755, true);
-        }
-    }
     public function getArguments()
     {
         return [

@@ -1,4 +1,4 @@
-<?php namespace Laradic\Docit\Console;
+<?php namespace {namespace}\Console;
 
 use Laradic\Support\AbstractConsoleCommand;
 use Symfony\Component\Console\Input\InputArgument;
@@ -26,7 +26,7 @@ class StubCommand extends AbstractConsoleCommand
     public function getOptions()
     {
         return [
-            ['opt', InputOption::VALUE_OPTIONAL, 'Description']
+            ['opt', 'o', InputOption::VALUE_OPTIONAL, 'Description']
         ];
     }
 }

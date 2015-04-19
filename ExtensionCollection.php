@@ -10,11 +10,15 @@
  */
 namespace Laradic\Extensions;
 
+use ArrayAccess;
 use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Database\Connection;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
+#use Laradic\Extensions\Contracts\ExtensionRepository;
+use Laradic\Extensions\Contracts\ExtensionRepository;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
+use Laradic\Extensions\Extension;
+use Laradic\Extensions\Repositories\EloquentExtensionRepository;
 use Laradic\Support\Sorter;
 use Laradic\Support\TemplateParser;
 
@@ -22,36 +26,41 @@ use Laradic\Support\TemplateParser;
  * Class ExtensionCollection
  *
  * @package     Laradic\Extensions
- * @method Extension[] all
  */
-class ExtensionCollection extends Collection implements ExtensionsContract
+class ExtensionCollection implements ArrayAccess, ExtensionsContract
 {
+
     /** @var \Illuminate\Filesystem\Filesystem */
     protected $files;
 
-    /** @var \Laradic\Extensions\ExtensionFileFinder  */
+    /** @var \Laradic\Extensions\ExtensionFileFinder */
     protected $finder;
 
-    /** @var \Illuminate\Foundation\Application  */
+    /** @var \Illuminate\Foundation\Application */
     protected $app;
 
-    /** @var \Illuminate\Database\Connection  */
-    protected $connection;
+    /** @var \Illuminate\Support\Collection */
+    protected $extensions;
+
+    /** @var \Laradic\Extensions\Contracts\ExtensionRepository */
+    protected $repository;
 
     /**
      * Instanciates the class
      *
-     * @param \Illuminate\Contracts\Foundation\Application $app
-     * @param \Illuminate\Filesystem\Filesystem            $files
-     * @param \Laradic\Extensions\ExtensionFileFinder      $finder
-     * @param \Illuminate\Database\Connection              $connection
+     * @param \Illuminate\Contracts\Foundation\Application      $app
+     * @param \Illuminate\Filesystem\Filesystem                 $files
+     * @param \Laradic\Extensions\ExtensionFileFinder           $finder
+     * @param \Laradic\Extensions\Contracts\ExtensionRepository $repository
      */
-    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, Connection $connection)
+    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, ExtensionRepository $repository)
     {
-        $this->connection = $connection;
+        $this->repository = $repository;
         $this->app        = $app;
         $this->files      = $files;
         $this->finder     = $finder;
+
+        $this->extensions = new Collection();
     }
 
     /**
@@ -62,7 +71,28 @@ class ExtensionCollection extends Collection implements ExtensionsContract
      */
     public function get($slug)
     {
-        return parent::get($slug);
+        return $this->extensions->get($slug);
+    }
+
+    /**
+     * has
+     *
+     * @param mixed $slug
+     * @return bool
+     */
+    public function has($slug)
+    {
+        return $this->extensions->has($slug);
+    }
+
+    /**
+     * all
+     *
+     * @return Extension[]
+     */
+    public function all()
+    {
+        return $this->extensions->all();
     }
 
     /**
@@ -74,6 +104,7 @@ class ExtensionCollection extends Collection implements ExtensionsContract
     public function getTemplateParser($sourcePath = null)
     {
         $sourcePath = is_null($sourcePath) ? realpath(__DIR__ . '/resources/stubs') : $sourcePath;
+
         return new TemplateParser($this->app->make('files'), $sourcePath);
     }
 
@@ -112,9 +143,21 @@ class ExtensionCollection extends Collection implements ExtensionsContract
      */
     public function createFromFile($extensionFilePath)
     {
-        $properties = $this->files->getRequire($extensionFilePath);
+        $attributes = $this->files->getRequire($extensionFilePath);
 
-        return new Extension($this, dirname($extensionFilePath), $properties);
+        return $this->make()
+            ->setPath(dirname($extensionFilePath))
+            ->setAttributes($attributes);
+    }
+
+    /**
+     * make
+     *
+     * @return Extension
+     */
+    public function make()
+    {
+        return new Extension($this, $this->repository); #$this->app->make('Laradic\Extensions\Extension');
     }
 
     /**
@@ -127,7 +170,7 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         foreach ($this->finder->findAll() as $extensionFilePath)
         {
             $extension = $this->createFromFile($extensionFilePath);
-            $this->put($extension->getSlug(), $extension);
+            $this->extensions->put($extension->getSlug(), $extension);
         }
 
         foreach ($this->sortByDependencies()->all() as $extension)
@@ -180,20 +223,8 @@ class ExtensionCollection extends Collection implements ExtensionsContract
         }
         $this->items = $extensions;
 
-        #Debugger::log('deps', $this->items, $sorted, array_reverse($sorted));
         return $this;
     }
-
-    /**
-     * Get the value of connection
-     *
-     * @return \Illuminate\Database\Connection
-     */
-    public function getConnection()
-    {
-        return $this->connection;
-    }
-
 
     /**
      * Get the value of finder
@@ -218,10 +249,65 @@ class ExtensionCollection extends Collection implements ExtensionsContract
     /**
      * Get the value of app
      *
-     * @return \Illuminate\Contracts\Foundation\Application
+     * @return \Illuminate\Foundation\Application
      */
     public function getApplication()
     {
         return $this->app;
+    }
+
+    /**
+     * Determine if an item exists at an offset.
+     *
+     * @param  mixed $key
+     * @return bool
+     */
+    public function offsetExists($key)
+    {
+        return $this->has($key);
+    }
+
+    /**
+     * offsetGet
+     *
+     * @param string $slug
+     * @return \Laradic\Extensions\Extension
+     */
+    public function offsetGet($slug)
+    {
+        return $this->get($slug);
+    }
+
+    /**
+     * Set the item at a given offset.
+     *
+     * @param  string $slug
+     * @param  \Laradic\Extensions\Extension $extension
+     * @return void
+     */
+    public function offsetSet($slug, $extension)
+    {
+        if ( is_array($slug) )
+        {
+            foreach ($slug as $innerKey => $innerValue)
+            {
+                $this->extensions->put($innerKey, $innerValue);
+            }
+        }
+        else
+        {
+            $this->extensions->put($slug, $extension);
+        }
+    }
+
+    /**
+     * Unset the item at a given offset.
+     *
+     * @param  string $slug
+     * @return void
+     */
+    public function offsetUnset($slug)
+    {
+        $this->extensions->put($slug, null);
     }
 }

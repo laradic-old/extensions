@@ -7,9 +7,17 @@ use Laradic\Extensions\ExtensionCollection;
 return array(
     'name' => '{packageName}',
     'slug' => '{vendor}/{package}',
-    'dependencies' => [],
+    'dependencies' => [
+    ],
+    'migrations' => [],
     'seeds' => [],
-    'migrations' => ["create_{vendor}_{package}"],
+    'paths' => [
+        // defaults
+        'config' => 'resources/config',
+        'theme' => 'resources/theme',
+        'migrations' => 'resources/migrations',
+        'seeds' => 'resources/seeds'
+    ],
     'register' => function(Application $app, Extension $extension, ExtensionCollection $extensions)
     {
 

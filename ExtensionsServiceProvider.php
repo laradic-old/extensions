@@ -4,8 +4,11 @@
  */
 namespace Laradic\Extensions;
 
+
 use Illuminate\Contracts\Foundation\Application;
 use Laradic\Config\Traits\ConfigProviderTrait;
+use Laradic\Extensions\Models\Extension as ExtensionModel;
+use Laradic\Extensions\Repositories\EloquentExtensionRepository;
 use Laradic\Support\ServiceProvider;
 use Laradic\Support\TemplateParser;
 
@@ -22,9 +25,9 @@ class ExtensionsServiceProvider extends ServiceProvider
 {
     use ConfigProviderTrait;
 
-   # protected $configFiles = ['laradic_extensions'];
+    protected $dir = __DIR__;
 
-   # protected $dir = __DIR__;
+    protected $migrationDirs = ['migrations'];
 
     public function boot()
     {
@@ -49,12 +52,35 @@ class ExtensionsServiceProvider extends ServiceProvider
         $app = parent::register();
 
         $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__.'/resources/config'));
+        #$this->publishes([__DIR__.'/resources/migrations/' => base_path('/database/migrations')], 'migrations');
 
-        $this->publishes([
-            __DIR__.'/resources/migrations/' => base_path('/database/migrations')
-        ], 'migrations');
+        $this->registerEloquentExtensions();
+        $this->registerExtensions();
+        $this->registerGenerator();
 
-        #$app->make('config')->get
+        if($app->runningInConsole())
+        {
+            $app->register('Laradic\Extensions\Providers\ConsoleServiceProvider');
+        }
+
+    }
+
+    protected function registerEloquentExtensions()
+    {
+        /** @var \Illuminate\Foundation\Application $app */
+        $app = $this->app;
+
+        $app->singleton('extensions.repository', function(Application $app)
+        {
+            return new EloquentExtensionRepository('Laradic\Extensions\Models\Extension');
+        });
+        $this->alias('extensions.repository', 'Laradic\Extensions\Contracts\ExtensionRepository');
+    }
+
+    protected function registerExtensions()
+    {
+        /** @var \Illuminate\Foundation\Application $app */
+        $app = $this->app;
 
         $app->bind('extensions.finder', function(Application $app){
             $finder = new ExtensionFileFinder($app->make('files'));
@@ -63,22 +89,26 @@ class ExtensionsServiceProvider extends ServiceProvider
         });
 
         $app->singleton('extensions', function(Application $app){
-            return new ExtensionCollection($app, $app->make('files'), $app->make('extensions.finder'), $app->make('db')->connection());
+            return new ExtensionCollection($app, $app->make('files'), $app->make('extensions.finder'), $app->make('extensions.repository'));
         });
         $this->alias('extensions', 'Laradic\Extensions\Contracts\Extensions');
         $this->alias('Extensions', 'Laradic\Extensions\Facades\Extensions');
         $app->make('extensions')->locateAndRegisterAll()->sortByDependencies();
 
+        $app->bind('Laradic\Extensions\Extension', function(Application $app)
+        {
+            return new Extension($app->make('extensions'), $app->make('extensions.repository'));
+        });
+    }
+
+    protected function registerGenerator()
+    {
+        /** @var \Illuminate\Foundation\Application $app */
+        $app = $this->app;
 
         $app->bind('extensions.generator', function(Application $app){
             $parser = new TemplateParser($app->make('files'), realpath(__DIR__ . '/resources/stubs'));
             return $parser;
         });
-
-        if($app->runningInConsole())
-        {
-            $app->register('Laradic\Extensions\Providers\ConsoleServiceProvider');
-        }
-
     }
 }

@@ -39,7 +39,7 @@ class {packageName}ServiceProvider extends ServiceProvider
 
         if($app->runningInConsole())
         {
-            $app->register('{namespace}\Console\ConsoleServiceProvider');
+            $app->register('{namespace}\Providers\ConsoleServiceProvider');
         }
     }
 }
