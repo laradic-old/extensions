@@ -20,13 +20,13 @@ use Symfony\Component\VarDumper\VarDumper;
 abstract class BaseExtensionsCommand extends AbstractConsoleCommand
 {
 
-    /** @var \Laradic\Extensions\ExtensionCollection */
+    /** @var \Laradic\Extensions\ExtensionFactory */
     protected $extensions;
 
     /**
      * getExtensions
      *
-     * @return \Laradic\Extensions\ExtensionCollection
+     * @return \Laradic\Extensions\ExtensionFactory
      */
     protected function getExtensions()
     {

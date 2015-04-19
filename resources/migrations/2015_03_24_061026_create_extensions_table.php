@@ -17,7 +17,7 @@ class CreateExtensionsTable extends Migration {
             $table->string('slug');
             $table->boolean('installed');
 
-            $table->unique('slug');
+            $table->unique(['slug']);
         });
 	}
 

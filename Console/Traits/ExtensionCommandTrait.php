@@ -24,7 +24,7 @@ trait ExtensionCommandTrait
     /**
      * getExtensions
      *
-     * @return \Laradic\Extensions\ExtensionCollection
+     * @return \Laradic\Extensions\ExtensionFactory
      */
     public function getExtensions()
     {

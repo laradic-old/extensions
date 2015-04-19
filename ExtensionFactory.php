@@ -12,13 +12,10 @@ namespace Laradic\Extensions;
 
 use ArrayAccess;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
-#use Laradic\Extensions\Contracts\ExtensionRepository;
-use Laradic\Extensions\Contracts\ExtensionRepository;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
-use Laradic\Extensions\Extension;
-use Laradic\Extensions\Repositories\EloquentExtensionRepository;
 use Laradic\Support\Sorter;
 use Laradic\Support\TemplateParser;
 
@@ -27,7 +24,7 @@ use Laradic\Support\TemplateParser;
  *
  * @package     Laradic\Extensions
  */
-class ExtensionCollection implements ArrayAccess, ExtensionsContract
+class ExtensionFactory implements ArrayAccess, ExtensionsContract
 {
 
     /** @var \Illuminate\Filesystem\Filesystem */
@@ -42,20 +39,20 @@ class ExtensionCollection implements ArrayAccess, ExtensionsContract
     /** @var \Illuminate\Support\Collection */
     protected $extensions;
 
-    /** @var \Laradic\Extensions\Contracts\ExtensionRepository */
-    protected $repository;
+    /** @var \Illuminate\Database\ConnectionInterface */
+    protected $connection;
 
     /**
      * Instanciates the class
      *
-     * @param \Illuminate\Contracts\Foundation\Application      $app
-     * @param \Illuminate\Filesystem\Filesystem                 $files
-     * @param \Laradic\Extensions\ExtensionFileFinder           $finder
-     * @param \Laradic\Extensions\Contracts\ExtensionRepository $repository
+     * @param \Illuminate\Contracts\Foundation\Application $app
+     * @param \Illuminate\Filesystem\Filesystem            $files
+     * @param \Laradic\Extensions\ExtensionFileFinder      $finder
+     * @param \Illuminate\Database\ConnectionInterface     $connection
      */
-    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, ExtensionRepository $repository)
+    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, ConnectionInterface $connection)
     {
-        $this->repository = $repository;
+        $this->connection = $connection;
         $this->app        = $app;
         $this->files      = $files;
         $this->finder     = $finder;
@@ -157,7 +154,7 @@ class ExtensionCollection implements ArrayAccess, ExtensionsContract
      */
     public function make()
     {
-        return new Extension($this, $this->repository); #$this->app->make('Laradic\Extensions\Extension');
+        return new Extension($this, $this->connection);
     }
 
     /**
@@ -224,6 +221,33 @@ class ExtensionCollection implements ArrayAccess, ExtensionsContract
         $this->items = $extensions;
 
         return $this;
+    }
+
+
+
+    protected function dbQuery()
+    {
+        return $this->connection->table('extensions');
+    }
+
+    public function dbGetBySlug($slug)
+    {
+        return $this->dbQuery()->where('slug', '=', $slug)->first();
+    }
+
+    public function dbCreate($slug)
+    {
+        return $this->dbQuery()->insert(['slug' => $slug]);
+    }
+
+    public function dbInstall($slug)
+    {
+        $this->dbQuery()->where('slug', '=', $slug)->update(['installed', 1]);
+    }
+
+    public function dbUninstall($slug)
+    {
+        $this->dbQuery()->where('slug', '=', $slug)->update(['installed', 0]);
     }
 
     /**

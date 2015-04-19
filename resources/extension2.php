@@ -2,7 +2,7 @@
 
 use Illuminate\Contracts\Foundation\Application;
 use Laradic\Extensions\Extension;
-use Laradic\Extensions\ExtensionCollection;
+use Laradic\Extensions\ExtensionFactory;
 
 return array(
     'name' => '{packageName}',
@@ -18,19 +18,19 @@ return array(
         'migrations' => 'resources/migrations',
         'seeds' => 'resources/seeds'
     ],
-    'register' => function(Application $app, Extension $extension, ExtensionCollection $extensions)
+    'register' => function(Application $app, Extension $extension, ExtensionFactory $extensions)
     {
 
     },
-    'boot' => function(Application $app, Extension $extension, ExtensionCollection $extensions)
+    'boot' => function(Application $app, Extension $extension, ExtensionFactory $extensions)
     {
         $app->register('{namespace}\{packageName}ServiceProvider');
     },
-    'install' => function(Application $app, Extension $extension, ExtensionCollection $extensions)
+    'install' => function(Application $app, Extension $extension, ExtensionFactory $extensions)
     {
 
     },
-    'uninstall' => function(Application $app, Extension $extension, ExtensionCollection $extensions)
+    'uninstall' => function(Application $app, Extension $extension, ExtensionFactory $extensions)
     {
 
     }

@@ -6,11 +6,10 @@ namespace Laradic\Extensions;
 
 use ArrayAccess;
 use Config;
+use Illuminate\Database\ConnectionInterface;
 use Laradic\Extensions\Contracts\Extension as ExtensionContract;
-use Laradic\Extensions\Contracts\ExtensionRepository;
 use Laradic\Support\Path;
 use Laradic\Support\Traits\EventDispatcherTrait;
-use Symfony\Component\VarDumper\VarDumper;
 use Themes;
 
 /**
@@ -26,7 +25,7 @@ class Extension implements ExtensionContract, ArrayAccess
 {
     use EventDispatcherTrait;
 
-    /** @var \Laradic\Extensions\ExtensionCollection */
+    /** @var \Laradic\Extensions\ExtensionFactory */
     protected $extensions;
 
     /** @var string */
@@ -44,41 +43,37 @@ class Extension implements ExtensionContract, ArrayAccess
     /** @var string */
     protected $path;
 
-    /** @var array */
+    /** @var \StdClass */
     protected $record;
-
-    /**
-     * @var \Laradic\Extensions\Repositories\EloquentExtensionRepository
-     */
-    protected $repository;
 
     /**
      * Instanciates the class
      *
-     * @param \Laradic\Extensions\ExtensionCollection $extensions
-     * @param                                         $path
-     * @param array                                   $attributes
+     * @param \Laradic\Extensions\ExtensionFactory $extensions
+     * @internal param \Illuminate\Database\ConnectionInterface $connection
+     * @internal param \Laradic\Extensions\Contracts\ExtensionRepository $repository
+     * @internal param $path
+     * @internal param array $attributes
      */
-    public function __construct(ExtensionCollection $extensions, ExtensionRepository $repository)
+    public function __construct(ExtensionFactory $extensions)
     {
         $this->extensions = $extensions;
-        $this->repository = $repository;
     }
 
 
     public function install()
     {
         $this->fireEvent('extension.installing', [$this]);
-        if(!$this->canInstall())
+        if ( ! $this->canInstall() )
         {
             return false;
         }
-        if($this->handles('migrations'))
+        if ( $this->handles('migrations') )
         {
             $this->runMigrations('up');
         }
         $this->callPropertiesClosure('install');
-        $this->repository->install($this->slug);
+        $this->extensions->dbInstall($this->slug);
         $this->fireEvent('extension.installed', [$this]);
     }
 
@@ -94,7 +89,7 @@ class Extension implements ExtensionContract, ArrayAccess
 
         $this->runMigrations('down');
         $this->callPropertiesClosure('uninstall');
-        $this->repository->uninstall($this->slug);
+        $this->extensions->dbUninstall($this->slug);
         $this->fireEvent('extension.uninstalled', [$this]);
     }
 
@@ -105,7 +100,7 @@ class Extension implements ExtensionContract, ArrayAccess
             return;
         }
         $this->fireEvent('extension.register', [$this]);
-        if($this->handles('config'))
+        if ( $this->handles('config') )
         {
             Config::addPublisher($this->getSlug(), $this->getPath('config'));
         }
@@ -120,7 +115,7 @@ class Extension implements ExtensionContract, ArrayAccess
             return;
         }
         $this->fireEvent('extension.booting', [$this]);
-        if($this->handles('themes'))
+        if ( $this->handles('themes') )
         {
             Themes::addPackagePublisher($this->getSlug(), $this->getPath('themes'));
         }
@@ -148,7 +143,7 @@ class Extension implements ExtensionContract, ArrayAccess
 
     public function isInstalled()
     {
-        return (bool)$this->record['installed'];
+        return (bool) $this->record->installed;
     }
 
     protected function callPropertiesClosure($name)
@@ -190,10 +185,11 @@ class Extension implements ExtensionContract, ArrayAccess
 
     public function handles($handle)
     {
-        if(!in_array($handle, $this['handles']) or $this["handles.${handle}"] !== true)
+        if ( ! in_array($handle, $this['handles']) or $this["handles.${handle}"] !== true )
         {
             return false;
         }
+
         return true;
     }
 
@@ -256,16 +252,43 @@ class Extension implements ExtensionContract, ArrayAccess
         return $this;
     }
 
-
+    /**
+     * getDefaultAttributes
+     *
+     * @return mixed
+     */
     public function getDefaultAttributes()
     {
         return Config::get('laradic/extensions::defaultExtensionAttributes');
     }
 
     /**
+     * ensureRecord
+     *
+     * @throws \ErrorException
+     */
+    public function ensureRecord()
+    {
+        if(isset($this->record))
+        {
+            return;
+        }
+
+        if (! $this->record = $this->extensions->dbGetBySlug($this->slug) )
+        {
+            if ( ! $this->extensions->dbCreate($this->slug) )
+            {
+                throw new \ErrorException("Could not ensure record for [{$this->getSlug()}]");
+            }
+            #$this->record = $this->extensions->dbGetBySlug($this->slug);
+            $this->ensureRecord();
+        }
+    }
+
+    /**
      * Get the value of extensions
      *
-     * @return \Laradic\Extensions\ExtensionCollection
+     * @return \Laradic\Extensions\ExtensionFactory
      */
     public function getExtensions()
     {
@@ -325,10 +348,7 @@ class Extension implements ExtensionContract, ArrayAccess
         $this->dependencies = $attributes['dependencies'];
         $this->name         = $attributes['name'];
 
-        if ( ! $this->record = $this->repository->getBySlug($this->slug) )
-        {
-            $this->repository->create($this->slug);
-        }
+        $this->ensureRecord();
 
         return $this;
     }

@@ -25,6 +25,12 @@ class EloquentExtensionRepository extends AbstractEloquentRepository implements 
     /** @var string */
     protected $model = 'Laradic\Extensions\Models\Extension';
 
+    public function createModel()
+    {
+        return parent::createModel();
+    }
+
+
     /**
      * Get extension by usint the slug
      *
