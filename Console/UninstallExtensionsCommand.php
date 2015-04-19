@@ -36,6 +36,7 @@ class UninstallExtensionsCommand extends AbstractConsoleCommand
         {
             $extension->uninstall();
             $this->info("Extension [$slug] uninstalled");
+
         }
         else
         {

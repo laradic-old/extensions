@@ -11,7 +11,7 @@ return array(
             'migrations' => 'resources/migrations',
             'seeds'      => 'resources/seeds',
         ),
-        'handle' => array(
+        'handles' => array(
             'config'     => true,
             'theme'      => true,
             'migrations' => true,

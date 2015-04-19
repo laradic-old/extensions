@@ -11,11 +11,14 @@
 namespace Laradic\Extensions;
 
 use ArrayAccess;
+use Debugger;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Filesystem\Filesystem;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Collection;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
+use Laradic\Support\Filesystem;
+use Laradic\Support\Path;
 use Laradic\Support\Sorter;
 use Laradic\Support\TemplateParser;
 
@@ -27,7 +30,7 @@ use Laradic\Support\TemplateParser;
 class ExtensionFactory implements ArrayAccess, ExtensionsContract
 {
 
-    /** @var \Illuminate\Filesystem\Filesystem */
+    /** @var \Laradic\Support\Filesystem */
     protected $files;
 
     /** @var \Laradic\Extensions\ExtensionFileFinder */
@@ -42,17 +45,21 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     /** @var \Illuminate\Database\ConnectionInterface */
     protected $connection;
 
+    protected $resolver;
+
     /**
      * Instanciates the class
      *
-     * @param \Illuminate\Contracts\Foundation\Application $app
-     * @param \Illuminate\Filesystem\Filesystem            $files
-     * @param \Laradic\Extensions\ExtensionFileFinder      $finder
-     * @param \Illuminate\Database\ConnectionInterface     $connection
+     * @param \Illuminate\Contracts\Foundation\Application     $app
+     * @param \Laradic\Support\Filesystem                      $files
+     * @param \Laradic\Extensions\ExtensionFileFinder          $finder
+     * @param \Illuminate\Database\ConnectionResolverInterface $resolver
+     * @internal param \Illuminate\Database\ConnectionInterface $connection
      */
-    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, ConnectionInterface $connection)
+    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, ConnectionResolverInterface $resolver)
     {
-        $this->connection = $connection;
+        $this->resolver   = $resolver;
+        $this->connection = $resolver->connection($resolver->getDefaultConnection());
         $this->app        = $app;
         $this->files      = $files;
         $this->finder     = $finder;
@@ -154,7 +161,7 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      */
     public function make()
     {
-        return new Extension($this, $this->connection);
+        return new Extension($this, $this->files);
     }
 
     /**
@@ -223,7 +230,14 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
         return $this;
     }
 
-
+    public function runSeed($filePath, $className = null)
+    {
+        $seeder         = $this->app->make('seeder');
+        $this->files->requireOnce($filePath);
+        $className = isset($className) ? $className : Path::getFilenameWithoutExtension($filePath);
+        $seeder->call($className);
+        Debugger::dump("Seeded $filePath / $className");
+    }
 
     protected function dbQuery()
     {
@@ -242,13 +256,62 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
 
     public function dbInstall($slug)
     {
-        $this->dbQuery()->where('slug', '=', $slug)->update(['installed', 1]);
+        $this->dbQuery()->where('slug', '=', $slug)->update(['installed' => 1]);
     }
 
     public function dbUninstall($slug)
     {
-        $this->dbQuery()->where('slug', '=', $slug)->update(['installed', 0]);
+        $this->dbQuery()->where('slug', '=', $slug)->update(['installed' => 0]);
     }
+
+
+    /**
+     * Get the value of connection
+     *
+     * @return ConnectionInterface
+     */
+    public function getConnection()
+    {
+        return $this->connection;
+    }
+
+    /**
+     * Sets the value of connection
+     *
+     * @param ConnectionInterface $connection
+     * @return ConnectionInterface
+     */
+    public function setConnection($connection)
+    {
+        $this->connection = $connection;
+
+        return $this;
+    }
+
+    /**
+     * Get the value of resolver
+     *
+     * @return \Illuminate\Database\ConnectionResolverInterface
+     */
+    public function getResolver()
+    {
+        return $this->resolver;
+    }
+
+    /**
+     * Sets the value of resolver
+     *
+     * @param \Illuminate\Database\ConnectionResolverInterface $resolver
+     * @return \Illuminate\Database\ConnectionResolverInterface
+     */
+    public function setResolver($resolver)
+    {
+        $this->resolver = $resolver;
+
+        return $this;
+    }
+
+
 
     /**
      * Get the value of finder
@@ -305,7 +368,7 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     /**
      * Set the item at a given offset.
      *
-     * @param  string $slug
+     * @param  string                        $slug
      * @param  \Laradic\Extensions\Extension $extension
      * @return void
      */

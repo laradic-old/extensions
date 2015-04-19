@@ -6,10 +6,13 @@ namespace Laradic\Extensions;
 
 use ArrayAccess;
 use Config;
-use Illuminate\Database\ConnectionInterface;
+use Debugger;
+use Illuminate\Database\QueryException;
 use Laradic\Extensions\Contracts\Extension as ExtensionContract;
+use Laradic\Support\Filesystem;
 use Laradic\Support\Path;
 use Laradic\Support\Traits\EventDispatcherTrait;
+use Symfony\Component\VarDumper\VarDumper;
 use Themes;
 
 /**
@@ -46,6 +49,8 @@ class Extension implements ExtensionContract, ArrayAccess
     /** @var \StdClass */
     protected $record;
 
+    protected $files;
+
     /**
      * Instanciates the class
      *
@@ -55,41 +60,56 @@ class Extension implements ExtensionContract, ArrayAccess
      * @internal param $path
      * @internal param array $attributes
      */
-    public function __construct(ExtensionFactory $extensions)
+    public function __construct(ExtensionFactory $extensions, Filesystem $files)
     {
         $this->extensions = $extensions;
+        $this->files      = $files;
     }
 
 
     public function install()
     {
         $this->fireEvent('extension.installing', [$this]);
+        $this->callPropertiesClosure('pre_install');
         if ( ! $this->canInstall() )
         {
             return false;
         }
+
         if ( $this->handles('migrations') )
         {
             $this->runMigrations('up');
         }
+
+        if ( $this->handles('seeds') )
+        {
+            $this->runSeeders();
+        }
+
         $this->callPropertiesClosure('install');
         $this->extensions->dbInstall($this->slug);
+        $this->callPropertiesClosure('installed');
         $this->fireEvent('extension.installed', [$this]);
     }
 
     public function uninstall()
     {
         $this->fireEvent('extension.uninstalling', [$this]);
-        // Check if there are extensions installed that rely on this one
+        $this->callPropertiesClosure('pre_uninstall');
         if ( ! $this->canUninstall() )
         {
             // Cancel the uninstallation
             return false;
         }
 
-        $this->runMigrations('down');
+        if ( $this->handles('migrations') )
+        {
+            $this->runMigrations('down');
+        }
+
         $this->callPropertiesClosure('uninstall');
         $this->extensions->dbUninstall($this->slug);
+        $this->callPropertiesClosure('uninstalled');
         $this->fireEvent('extension.uninstalled', [$this]);
     }
 
@@ -143,7 +163,7 @@ class Extension implements ExtensionContract, ArrayAccess
 
     public function isInstalled()
     {
-        return (bool) $this->record->installed;
+        return (bool)$this->record->installed;
     }
 
     protected function callPropertiesClosure($name)
@@ -200,8 +220,8 @@ class Extension implements ExtensionContract, ArrayAccess
      */
     protected function runMigrations($way = 'up')
     {
-        $path = $this->getPath('migrations');
-        if ( ! $this->extensions->getFiles()->isDirectory($path) )
+        $paths = $this->getPath('migrations');
+        if ( ! isset($paths) or ! is_array($paths) )
         {
             return;
         }
@@ -209,23 +229,80 @@ class Extension implements ExtensionContract, ArrayAccess
         /** @var \Illuminate\Foundation\Application $app */
         $app            = $this->getExtensions()->getApplication();
         $migrator       = $app->make('migrator');
-        $migrationFiles = $migrator->getMigrationFiles($path);
-        $migrator->requireFiles($path, $migrationFiles);
+        $migrator->setConnection($this->extensions->getResolver()->getDefaultConnection());
 
-        foreach ($migrationFiles as $migrationFile)
+        foreach ($paths as $path)
         {
-            $migration = $migrator->resolve($migrationFile);
-
-            if ( $way === 'up' )
+            if ( ! $this->extensions->getFiles()->isDirectory($path) )
             {
-                $migration->up($path);
+                return;
             }
-            elseif ( $way === 'down' )
+
+            $migrationFiles = $migrator->getMigrationFiles($path);
+            $migrator->requireFiles($path, $migrationFiles);
+            Debugger::dump(compact('path', 'migrationFiles', 'way'));
+
+            foreach ($migrationFiles as $migrationFile)
             {
-                $migration->down();
+
+                $migration = $migrator->resolve($migrationFile);
+
+                #VarDumper::dump(compact('path', 'migrationFile', 'way', 'migration'));
+                try
+                {
+                    if ( $way === 'up' )
+                    {
+                        $migration->up();
+                    }
+                    elseif ( $way === 'down' )
+                    {
+                        $migration->down();
+                    }
+                }
+                catch(QueryException $qe)
+                {
+                    Debugger::dump('Error migrating: ' . $qe->getMessage());
+                }
+                catch(\PDOException $pe)
+                {
+                    Debugger::dump('Error migrating: ' . $pe->getMessage());
+                }
             }
         }
     }
+
+    protected function runSeeders()
+    {
+        $paths = $this->getPath('seeds');
+        if ( ! isset($paths) or ! is_array($paths) )
+        {
+            return;
+        }
+
+        foreach ($paths as $path)
+        {
+            if ( ! $this->extensions->getFiles()->isDirectory($path) )
+            {
+                return;
+            }
+
+            $seederFiles = $this->files->glob(Path::join($path, '*Seeder.php'));
+
+            foreach ($seederFiles as $file)
+            {
+                $this->extensions->runSeed($file);
+            }
+        }
+
+        foreach($this['seeds'] as $seedFilePath => $seedClassName)
+        {
+            $this->extensions->runSeed(
+                is_int($seedFilePath) ? $seedClassName : $seedFilePath,
+                is_int($seedFilePath) ? null : $seedClassName
+            );
+        }
+    }
+
 
     /**
      * Get the value of path
@@ -234,9 +311,39 @@ class Extension implements ExtensionContract, ArrayAccess
      */
     public function getPath($path = null)
     {
-        $path = is_null($path) ? $this->path : Path::join($this->path, $this["paths.$path"]);
+        if ( is_null($path) )
+        {
+            return realpath($this->path);
+        }
+        else
+        {
+            $paths = $this["paths.$path"];
+            if ( ! is_array($paths) )
+            {
+                $paths = [$paths];
+            }
 
-        return realpath($path);
+            $basePath = $this->path;
+            foreach ($paths as $i => $p)
+            {
+                #VarDumper::dump(compact('i', 'p'));
+                if ( Path::isRelative($p) )
+                {
+                    #VarDumper::dump('is relative : ' . realpath(Path::join($this->path, $p)));
+                    $paths[$i] = realpath(Path::join($this->path, $p));
+                }
+                else
+                {
+                    #VarDumper::dump('is NOT relative');
+                    $paths[$i] = realpath($p);
+                }
+            }
+
+            #VarDumper::dump(compact('basePath', 'paths', 'path'));
+           # VarDumper::dump($this["paths.$path"]);
+
+            return $paths;
+        }
     }
 
     /**
@@ -269,12 +376,12 @@ class Extension implements ExtensionContract, ArrayAccess
      */
     public function ensureRecord()
     {
-        if(isset($this->record))
+        if ( isset($this->record) )
         {
             return;
         }
 
-        if (! $this->record = $this->extensions->dbGetBySlug($this->slug) )
+        if ( ! $this->record = $this->extensions->dbGetBySlug($this->slug) )
         {
             if ( ! $this->extensions->dbCreate($this->slug) )
             {
@@ -343,7 +450,7 @@ class Extension implements ExtensionContract, ArrayAccess
      */
     public function setAttributes(array $attributes)
     {
-        $this->attributes   = array_merge($this->getDefaultAttributes(), $attributes);
+        $this->attributes   = array_merge_recursive($this->getDefaultAttributes(), $attributes);
         $this->slug         = $attributes['slug'];
         $this->dependencies = $attributes['dependencies'];
         $this->name         = $attributes['name'];
