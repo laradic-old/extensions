@@ -56,8 +56,12 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      * @param \Illuminate\Database\ConnectionResolverInterface $resolver
      * @internal param \Illuminate\Database\ConnectionInterface $connection
      */
-    public function __construct(Application $app, Filesystem $files, ExtensionFileFinder $finder, ConnectionResolverInterface $resolver)
-    {
+    public function __construct(
+        Application $app,
+        Filesystem $files,
+        ExtensionFileFinder $finder,
+        ConnectionResolverInterface $resolver
+    ) {
         $this->resolver   = $resolver;
         $this->connection = $resolver->connection($resolver->getDefaultConnection());
         $this->app        = $app;
@@ -171,13 +175,13 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      */
     public function locateAndRegisterAll()
     {
-        foreach ($this->finder->findAll() as $extensionFilePath)
+        foreach ( $this->finder->findAll() as $extensionFilePath )
         {
             $extension = $this->createFromFile($extensionFilePath);
             $this->extensions->put($extension->getSlug(), $extension);
         }
 
-        foreach ($this->sortByDependencies()->all() as $extension)
+        foreach ( $this->getSortedByDependency()->all() as $extension )
         {
             $this->register($extension);
         }
@@ -194,7 +198,7 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     public function register($extension)
     {
 
-        if ( ! $this->has($extension) and ! $extension instanceof Extension )
+        if ( ! $extension instanceof Extension and ! $this->has($extension))
         {
             $extension = $this->createFromFile($extension);
         }
@@ -214,29 +218,44 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      */
     public function sortByDependencies()
     {
-        $sorter = new Sorter();
-        foreach ($this->all() as $extension)
-        {
-            $sorter->addItem($extension->getSlug(), $extension->getDependencies());
-        }
-        $extensions = [];
-        $sorted     = $sorter->sort();
-        foreach ($sorted as $slug)
-        {
-            $extensions[$slug] = $this->get($slug);
-        }
-        $this->items = $extensions;
+        $this->extensions = $this->getSortedByDependency();
 
         return $this;
     }
 
+    public function getSortedByDependency()
+    {
+        $sorter = new Sorter();
+        foreach ( $this->all() as $extension )
+        {
+            $sorter->addItem($extension->getSlug(), $extension->getDependencies());
+        }
+        $extensions = [ ];
+        $sorted     = $sorter->sort();
+
+        foreach ( $sorted as $slug )
+        {
+            $extensions[ $slug ] = $this->extensions->get($slug);
+        }
+
+        return new Collection($extensions);
+    }
+
     public function runSeed($filePath, $className = null)
     {
-        $seeder         = $this->app->make('seeder');
+        $seeder = $this->app->make('seeder');
         $this->files->requireOnce($filePath);
         $className = isset($className) ? $className : Path::getFilenameWithoutExtension($filePath);
         $seeder->call($className);
         Debugger::dump("Seeded $filePath / $className");
+    }
+
+    public function updateAllRecords()
+    {
+        foreach ( $this->all() as $extension )
+        {
+            $extension->updateRecord();
+        }
     }
 
     protected function dbQuery()
@@ -251,17 +270,17 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
 
     public function dbCreate($slug)
     {
-        return $this->dbQuery()->insert(['slug' => $slug]);
+        return $this->dbQuery()->insert([ 'slug' => $slug ]);
     }
 
     public function dbInstall($slug)
     {
-        $this->dbQuery()->where('slug', '=', $slug)->update(['installed' => 1]);
+        $this->dbQuery()->where('slug', '=', $slug)->update([ 'installed' => 1 ]);
     }
 
     public function dbUninstall($slug)
     {
-        $this->dbQuery()->where('slug', '=', $slug)->update(['installed' => 0]);
+        $this->dbQuery()->where('slug', '=', $slug)->update([ 'installed' => 0 ]);
     }
 
 
@@ -310,7 +329,6 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
 
         return $this;
     }
-
 
 
     /**
@@ -376,7 +394,7 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     {
         if ( is_array($slug) )
         {
-            foreach ($slug as $innerKey => $innerValue)
+            foreach ( $slug as $innerKey => $innerValue )
             {
                 $this->extensions->put($innerKey, $innerValue);
             }

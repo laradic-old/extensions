@@ -6,7 +6,19 @@ An extension can depend on other extensions.
   
 - **Optional** Uses [laradic/themes](https://github.com/laradic/themes) for handling themes.
 - **Optional** Uses [laradic/config](https://github.com/laradic/config) for handling config.
-  
+
+Using themes and config will pretty much make using extensions using the namespace, an example:
+
+```php
+$extension      = Extensions::get('laradic/admin');
+$view           = View::get('laradic/admin:view.path');
+$configKeyValue = Config::get('laradic/admin:config.key');
+
+# Save the altered config to file or db
+Config::getLoader()->set('laradic/admin:config.key', 'value');
+
+```
+
 #### Example extension
 Check [laradic/admin](https://github.com/laradic/admin) or [laradic/docit](https://github.com/laradic/docit) for a working implementation.
   
@@ -105,9 +117,9 @@ Check out the API documentation for a complete overview.
 | `Extensions::has('vendor/package')` | Returns `bool` |
 | `Extensions::all()` | Returns a sorted by dependency `array` containing `Extension` instances |
 | `Extensions::addPath($path)` | Adds a path to search for extensions (like the `extensions` directory) |
-| `Extensions::locateAndRegisterAll('vendor/package')` | Returns `bool` |
+| `Extensions::locateAndRegisterAll()` | Returns `bool` |
 | `Extensions::register('vendor/package')` | Returns `bool` |
-| `Extensions::sortByDependencies('vendor/package')` | Returns `bool` |
+| `Extensions::sortByDependencies()` | Returns `bool` |
 | `Extensions::createFromFile('vendor/package')` | Returns `bool` |
 | `Extensions::has('vendor/package')` | Returns `bool` |
 | `Extensions::has('vendor/package')` | Returns `bool` |

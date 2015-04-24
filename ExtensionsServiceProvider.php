@@ -45,7 +45,8 @@ class ExtensionsServiceProvider extends ServiceProvider
         {
             return;
         }
-        $extensions = $app->make('extensions')->locateAndRegisterAll()->sortByDependencies()->all();
+        $extensions = $app->make('extensions')->getSortedByDependency()->all();
+        #$extensions = $app->make('extensions')->locateAndRegisterAll()->sortByDependencies()->all();
         foreach ($extensions as $extension)
         {
             if ( $extension->isInstalled() )
@@ -69,6 +70,7 @@ class ExtensionsServiceProvider extends ServiceProvider
         $this->installed  = \Schema::setConnection($this->connection)->hasTable('extensions');
 
         $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__ . '/resources/config'));
+
         if ( ! $this->installed )
         {
             return;
@@ -100,11 +102,9 @@ class ExtensionsServiceProvider extends ServiceProvider
         {
             return new ExtensionFactory($app, $app->make('files'), $app->make('extensions.finder'), $app->make('db'));
         });
-        $this->alias('extensions', 'Laradic\Extensions\Contracts\Extensions');
+        $app->bind('Laradic\Extensions\Contracts\Extensions', 'extensions');
         $this->alias('Extensions', 'Laradic\Extensions\Facades\Extensions');
-        $app->booted(function () use ($app)
-        {
-        });
+        $app->make('extensions')->locateAndRegisterAll();
     }
 
     protected function registerGenerator()

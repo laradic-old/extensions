@@ -4,6 +4,7 @@
  */
 namespace Laradic\Extensions\Console;
 
+use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
 use Laradic\Support\AbstractConsoleCommand;
 use Symfony\Component\Console\Input\InputArgument;
 
@@ -18,6 +19,7 @@ use Symfony\Component\Console\Input\InputArgument;
  */
 class InstallExtensionsCommand extends AbstractConsoleCommand
 {
+    use ExtensionCommandTrait;
 
     protected $name = 'extensions:install';
 
@@ -25,8 +27,33 @@ class InstallExtensionsCommand extends AbstractConsoleCommand
 
     public function fire()
     {
-        $extensions = app('extensions');
-        $slug       = $this->argument('slug');
+
+        $extensions = $this->getExtensions();
+
+        if ( ! $slug = $this->argument('slug') )
+        {
+            foreach($extensions->sortByDependencies()->all() as $extension)
+            {
+                $slug = $extension->getSlug();
+                $answer = config('app.debug') ? true : $this->confirm('Do you want to install ' . $this->colorize(['bold', 'black'], $slug), true);
+                if($answer)
+                {
+                    //$this->install($slug);
+                    $this->call('extensions:install', [
+                        'slug' => $slug
+                    ]);
+                }
+            }
+        }
+        else
+        {
+            $this->install($slug);
+        }
+    }
+
+    protected function install($slug)
+    {
+        $extensions = $this->getExtensions();
         if ( ! $extensions->has($slug) )
         {
             return $this->error("Extension [$slug] does not exist");
@@ -46,7 +73,7 @@ class InstallExtensionsCommand extends AbstractConsoleCommand
     public function getArguments()
     {
         return [
-            ['slug', InputArgument::REQUIRED, 'The extension slug']
+            [ 'slug', InputArgument::OPTIONAL, 'The extension slug' ]
         ];
     }
 }

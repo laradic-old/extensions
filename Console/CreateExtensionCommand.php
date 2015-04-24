@@ -11,7 +11,6 @@
 namespace Laradic\Extensions\Console;
 
 use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
-use Illuminate\Filesystem\Filesystem;
 use Laradic\Support\AbstractConsoleCommand;
 use Laradic\Support\Path;
 use Symfony\Component\Console\Input\InputArgument;
@@ -56,20 +55,20 @@ class CreateExtensionCommand extends AbstractConsoleCommand
             return $this->error("Extension slug [$slug] is not valid");
         }
 
-        $files = $this->getFiles();
+        $files      = $this->getFiles();
         $extensions = $this->getExtensions();
 
         list($vendor, $package) = $this->getSlugVendorAndPackage($slug);
-        $packageName = studly_case($package);
-        $vendorName = studly_case($vendor);
-        $namespace = $vendorName . '\\' . $packageName;
+        $packageName  = studly_case($package);
+        $vendorName   = studly_case($vendor);
+        $namespace    = $vendorName . '\\' . $packageName;
         $autoloadPsr4 = $vendorName . '\\\\' . $packageName . '\\\\';
 
         $basePath = is_null($path) ? head($extensions->getFinder()->getPaths()) : base_path($path);
-        $path = Path::join($basePath, $vendor, $package);
+        $path     = Path::join($basePath, $vendor, $package);
 
         $parser = $extensions->getTemplateParser();
-        $vars = compact('vendor', 'package', 'packageName', 'basePath', 'path', 'namespace', 'autoloadPsr4');
+        $vars   = compact('vendor', 'package', 'packageName', 'basePath', 'path', 'namespace', 'autoloadPsr4');
         $parser->setVar($vars);
 
         $files->deleteDirectory($path);
@@ -77,11 +76,11 @@ class CreateExtensionCommand extends AbstractConsoleCommand
         $parser->copyDirectory($path);
 
         $renameFiles = [
-            "src/ServiceProvider.php" => "src/{$packageName}ServiceProvider.php",
+            "src/ServiceProvider.php"             => "src/{$packageName}ServiceProvider.php",
             "src/Http/Controllers/Controller.php" => "src/Http/Controllers/{$packageName}Controller.php"
         ];
 
-        foreach($renameFiles as $renameFromPath => $renameToPath)
+        foreach ( $renameFiles as $renameFromPath => $renameToPath )
         {
             $files->move(Path::join($path, $renameFromPath), Path::join($path, $renameToPath));
         }
@@ -94,8 +93,8 @@ class CreateExtensionCommand extends AbstractConsoleCommand
     public function getArguments()
     {
         return [
-            ['slug', InputArgument::REQUIRED, 'The extension slug'],
-            ['path', InputArgument::OPTIONAL, 'The extension base path']
+            [ 'slug', InputArgument::REQUIRED, 'The extension slug' ],
+            [ 'path', InputArgument::OPTIONAL, 'The extension base path' ]
         ];
     }
 }

@@ -4,6 +4,7 @@
  */
 namespace Laradic\Extensions\Console;
 
+use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
 use Laradic\Support\AbstractConsoleCommand;
 use Symfony\Component\Console\Input\InputArgument;
 
@@ -18,6 +19,7 @@ use Symfony\Component\Console\Input\InputArgument;
  */
 class UninstallExtensionsCommand extends AbstractConsoleCommand
 {
+    use ExtensionCommandTrait;
 
     protected $name = 'extensions:uninstall';
 
@@ -25,7 +27,25 @@ class UninstallExtensionsCommand extends AbstractConsoleCommand
 
     public function fire()
     {
-        $extensions = app('extensions');
+        if(!$slug       = $this->argument('slug'))
+        {
+            foreach($this->getExtensions()->getSortedByDependency()->reverse()->all() as $extension)
+            {
+                //$extension->uninstall();
+                $this->call('extensions:uninstall', [
+                    'slug' => $extension->getSlug()
+                ]);
+            }
+        }
+        else
+        {
+            $this->uninstall($slug);
+        }
+    }
+
+    protected function uninstall($slug)
+    {
+        $extensions = $this->getExtensions();
         $slug       = $this->argument('slug');
         if ( ! $extensions->has($slug) )
         {
@@ -47,7 +67,7 @@ class UninstallExtensionsCommand extends AbstractConsoleCommand
     public function getArguments()
     {
         return [
-            ['slug', InputArgument::REQUIRED, 'The extension slug']
+            ['slug', InputArgument::OPTIONAL, 'The extension slug']
         ];
     }
 }
