@@ -59,6 +59,12 @@ class InstallExtensionsCommand extends Command
             return $this->error("Extension [$slug] does not exist");
         }
         $extension = $extensions->get($slug);
+
+        if(!$extension->canInstall())
+        {
+            return $this->error("Extension [$slug] can not be installed. Are all dependencies installed?");
+        }
+
         if ( ! $extension->isInstalled() )
         {
             $extension->install();
