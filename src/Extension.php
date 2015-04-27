@@ -288,7 +288,7 @@ class Extension implements ExtensionContract, ArrayAccess
     protected function callAttributesClosure($name)
     {
         #Debugger::dump(['extension' => $this->getSlug(), 'func' => 'callAttributesClosure', 'name' => $name, 'closure' => $this->attributes[$name], 'is_closure' => $this->attributes[$name] instanceof Closure]);
-        if ( $this->attributes[$name] instanceof \Closure )
+        if ( isset($this->attributes[$name]) and $this->attributes[$name] instanceof \Closure )
         {
             $this->attributes[$name]($this->extensions->getApplication(), $this, $this->extensions);
         }

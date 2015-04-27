@@ -7,7 +7,6 @@ namespace Laradic\Extensions;
 
 use Illuminate\Contracts\Foundation\Application;
 use Laradic\Config\Traits\ConfigProviderTrait;
-use Laradic\Extensions\Repositories\EloquentExtensionRepository;
 use Laradic\Support\ServiceProvider;
 use Laradic\Support\TemplateParser;
 
@@ -24,7 +23,9 @@ class ExtensionsServiceProvider extends ServiceProvider
 {
     use ConfigProviderTrait;
 
-    protected $dir = __DIR__ . '/../';
+    protected $dir = __DIR__;
+
+    protected $resourcesPath = '../resources';
 
     protected $migrationDirs = ['migrations'];
 
