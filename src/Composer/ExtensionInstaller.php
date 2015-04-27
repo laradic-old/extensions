@@ -27,7 +27,7 @@ class ExtensionInstaller extends LibraryInstaller
      */
     public function getPackageBasePath(PackageInterface $package)
     {
-        return __DIR__.'/../../../extensions/'.$package->getPrettyName();
+        return __DIR__.'/../../../../../extensions/'.$package->getPrettyName();
     }
 
 
