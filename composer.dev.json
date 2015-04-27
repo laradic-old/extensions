@@ -18,9 +18,7 @@
     "prefer-stable": true,
     "require": {
         "php": ">=5.4.0",
-        "laradic/support": "dev-master",
-        "laradic/config": "dev-master",
-        "illuminate/support": "5.0.*",
+        "laravel/framework": "~5.0",
         "composer-plugin-api": "1.0.0"
     },
     "autoload": {

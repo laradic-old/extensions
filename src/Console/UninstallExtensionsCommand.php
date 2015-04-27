@@ -5,7 +5,7 @@
 namespace Laradic\Extensions\Console;
 
 use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
-use Laradic\Support\AbstractConsoleCommand;
+use Laradic\Console\Command;
 use Symfony\Component\Console\Input\InputArgument;
 
 /**
@@ -17,7 +17,7 @@ use Symfony\Component\Console\Input\InputArgument;
  * @copyright   2011-2015, Robin Radic
  * @link        http://radic.mit-license.org
  */
-class UninstallExtensionsCommand extends AbstractConsoleCommand
+class UninstallExtensionsCommand extends Command
 {
     use ExtensionCommandTrait;
 

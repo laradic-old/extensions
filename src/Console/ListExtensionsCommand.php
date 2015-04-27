@@ -4,7 +4,7 @@
  */
 namespace Laradic\Extensions\Console;
 
-use Laradic\Support\AbstractConsoleCommand;
+use Laradic\Console\Command;
 
 /**
  * Class ListExtensionsCommand
@@ -15,7 +15,7 @@ use Laradic\Support\AbstractConsoleCommand;
  * @copyright   2011-2015, Robin Radic
  * @link        http://radic.mit-license.org
  */
-class ListExtensionsCommand extends AbstractConsoleCommand
+class ListExtensionsCommand extends Command
 {
     protected $name = 'extensions:list';
     protected $description = 'List all extensions.';

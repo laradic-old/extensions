@@ -24,7 +24,7 @@ class ExtensionsServiceProvider extends ServiceProvider
 {
     use ConfigProviderTrait;
 
-    protected $dir = __DIR__;
+    protected $dir = __DIR__ . '/../';
 
     protected $migrationDirs = ['migrations'];
 
@@ -69,7 +69,7 @@ class ExtensionsServiceProvider extends ServiceProvider
 
         $this->installed  = \Schema::setConnection($this->connection)->hasTable('extensions');
 
-        $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__ . '/resources/config'));
+        $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__ . '/../resources/config'));
 
         if ( ! $this->installed )
         {
@@ -114,7 +114,7 @@ class ExtensionsServiceProvider extends ServiceProvider
 
         $app->bind('extensions.generator', function (Application $app)
         {
-            $parser = new TemplateParser($app->make('files'), realpath(__DIR__ . '/resources/stubs'));
+            $parser = new TemplateParser($app->make('files'), realpath(__DIR__ . '/../resources/stubs'));
 
             return $parser;
         });

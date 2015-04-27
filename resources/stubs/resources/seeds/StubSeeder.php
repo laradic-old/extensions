@@ -8,7 +8,7 @@
  * @link        http://radic.mit-license.org
  */
 use Illuminate\Database\Seeder;
-use Laradic\Support\Str;
+use Laradic\Support\String;
 
 /**
  * Class StubSeeder
@@ -22,7 +22,7 @@ class StubSeeder extends Seeder
         for($i = 0; $i < 20; $i++)
         {
             DB::table('extension_{vendor}_{werkbon}')->insert([
-                'random' => Str::random()
+                'random' => String::random()
             ]);
         }
     }

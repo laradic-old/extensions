@@ -11,7 +11,7 @@
 namespace Laradic\Extensions\Console;
 
 use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
-use Laradic\Support\AbstractConsoleCommand;
+use Laradic\Console\Command;
 use Laradic\Support\Path;
 use Symfony\Component\Console\Input\InputArgument;
 
@@ -20,7 +20,7 @@ use Symfony\Component\Console\Input\InputArgument;
  *
  * @package     Laradic\Extensions\Console
  */
-class CreateExtensionCommand extends AbstractConsoleCommand
+class CreateExtensionCommand extends Command
 {
 
     use ExtensionCommandTrait;

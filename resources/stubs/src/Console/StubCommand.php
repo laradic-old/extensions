@@ -1,10 +1,10 @@
 <?php namespace {namespace}\Console;
 
-use Laradic\Support\AbstractConsoleCommand;
+use Laradic\Console\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
-class StubCommand extends AbstractConsoleCommand
+class StubCommand extends Command
 {
 
     protected $name = '{package}:stub';

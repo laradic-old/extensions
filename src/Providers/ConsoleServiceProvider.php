@@ -4,7 +4,7 @@
  */
 namespace Laradic\Extensions\Providers;
 
-use Laradic\Support\AbstractConsoleProvider;
+use Laradic\Console\AggregateConsoleProvider;
 
 /**
  * Class ConsoleServiceProvider
@@ -15,7 +15,7 @@ use Laradic\Support\AbstractConsoleProvider;
  * @copyright   2011-2015, Robin Radic
  * @link        http://radic.mit-license.org
  */
-class ConsoleServiceProvider extends AbstractConsoleProvider
+class ConsoleServiceProvider extends AggregateConsoleProvider
 {
 
     /**

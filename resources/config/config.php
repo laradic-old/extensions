@@ -2,7 +2,7 @@
 
 return array(
     'paths'                      => array(
-        base_path('extensions')
+        base_path('workbench')
     ),
     'defaultExtensionAttributes' => array(
         'paths'        => array(

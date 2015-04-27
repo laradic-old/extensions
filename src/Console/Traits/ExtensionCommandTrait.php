@@ -11,6 +11,7 @@
 namespace Laradic\Extensions\Console\Traits;
 
 use Laradic\Extensions\Console\Create\CreateMigrationCommand;
+use Laradic\Support\String;
 
 /**
  * Class ExtensionCommandTrait
@@ -74,71 +75,5 @@ trait ExtensionCommandTrait
     protected function getDatePrefix()
     {
         return date('Y_m_d_His');
-    }
-
-    /**
-     * validateSlug
-     *
-     * @param $slug
-     * @return bool
-     */
-    protected function validateSlug($slug)
-    {
-        if ( ! preg_match('/([a-z]*)\/([a-z]*)/', $slug, $matches) or count($matches) !== 3 )
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * getSlugVendorAndPackage
-     *
-     * @param $slug
-     * @return string[]
-     */
-    protected function getSlugVendorAndPackage($slug)
-    {
-        preg_match('/([a-z\-]*)\/([a-z\-]*)/', $slug, $matches);
-
-        return array_slice($matches, 1, 2);
-    }
-
-    /**
-     * convertSlugToClassName
-     *
-     * @param $slug
-     * @return string
-     */
-    protected function convertSlugToClassName($slug)
-    {
-        if ( $this->validateSlug($slug) )
-        {
-            list($vendor, $package) = $this->getSlugVendorAndPackage($slug);
-
-            return $this->convertSlugToClassName($vendor) . '\\' . $this->convertSlugToClassName($package);
-        }
-        else
-        {
-            $className = '';
-            if ( stristr($slug, '-') !== false )
-            {
-                $slugs = preg_split('/\-/', $slug);
-            }
-            else
-            {
-                $slugs = [$slug];
-            }
-
-            # VarDumper::dump($slugs);
-
-            foreach ($slugs as $_slug)
-            {
-                $className .= ucfirst($_slug);
-            }
-
-            return $className;
-        }
     }
 }
