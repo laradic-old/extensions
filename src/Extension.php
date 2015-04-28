@@ -176,14 +176,18 @@ class Extension implements ExtensionContract, ArrayAccess
 
         foreach ($paths as $path)
         {
+
             if ( ! $this->extensions->getFiles()->isDirectory($path) )
             {
                 continue;
             }
 
             $migrationFiles = $migrator->getMigrationFiles($path);
+            if($way === 'down'){
+                $migrationFiles = array_reverse($migrationFiles);
+            }
+
             $migrator->requireFiles($path, $migrationFiles);
-            #Debugger::dump(compact('path', 'migrationFiles', 'way'));
 
             foreach ($migrationFiles as $migrationFile)
             {
@@ -211,6 +215,7 @@ class Extension implements ExtensionContract, ArrayAccess
                     Debugger::dump('Error migrating: ' . $pe->getMessage());
                 }
             }
+
         }
     }
 

@@ -18,9 +18,9 @@
     "prefer-stable": true,
     "require": {
         "php": ">=5.4.0",
-        "laradic/support": "~1.2",
-        "laradic/console": "~1.0",
-        "laradic/config": "~1.3",
+        "laradic/support": "1.2.*",
+        "laradic/console": "1.0.*",
+        "laradic/config": "1.3.*",
         "illuminate/support": "5.0.*",
         "composer-plugin-api": "1.0.0"
     },

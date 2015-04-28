@@ -247,7 +247,7 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
         $this->files->requireOnce($filePath);
         $className = isset($className) ? $className : Path::getFilenameWithoutExtension($filePath);
         $seeder->call($className);
-        Debugger::dump("Seeded $filePath / $className");
+        #Debugger::dump("Seeded $filePath / $className");
     }
 
     public function updateAllRecords()
