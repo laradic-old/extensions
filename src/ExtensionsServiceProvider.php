@@ -25,18 +25,15 @@ class ExtensionsServiceProvider extends ServiceProvider
 
     protected $dir = __DIR__;
 
-    protected $resourcesPath = '../resources';
+    protected $migrationDirs = [ 'migrations' ];
 
-    protected $migrationDirs = ['migrations'];
+    protected $providers = [ 'Laradic\Extensions\Providers\ConsoleServiceProvider' ];
+
+    protected $provides = [ 'extensions', 'extensions.finder', 'extensions.generator' ];
 
     protected $connection;
 
     protected $installed = false;
-
-    public function provides()
-    {
-        return array('extensions', 'extensions.finder', 'extensions.generator');
-    }
 
     public function boot()
     {
@@ -47,8 +44,8 @@ class ExtensionsServiceProvider extends ServiceProvider
             return;
         }
         $extensions = $app->make('extensions')->getSortedByDependency()->all();
-        #$extensions = $app->make('extensions')->locateAndRegisterAll()->sortByDependencies()->all();
-        foreach ($extensions as $extension)
+
+        foreach ( $extensions as $extension )
         {
             if ( $extension->isInstalled() )
             {
@@ -67,7 +64,6 @@ class ExtensionsServiceProvider extends ServiceProvider
 
         $db               = $app->make('db');
         $this->connection = $db->connection($db->getDefaultConnection());
-
         $this->installed  = \Schema::setConnection($this->connection)->hasTable('extensions');
 
         $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__ . '/../resources/config'));
@@ -76,13 +72,9 @@ class ExtensionsServiceProvider extends ServiceProvider
         {
             return;
         }
+
         $this->registerExtensions();
         $this->registerGenerator();
-
-        if ( $app->runningInConsole() )
-        {
-            $app->register('Laradic\Extensions\Providers\ConsoleServiceProvider');
-        }
     }
 
     protected function registerExtensions()

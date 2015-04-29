@@ -12,7 +12,7 @@ use Illuminate\Database\QueryException;
 use Laradic\Extensions\Contracts\Extension as ExtensionContract;
 use Laradic\Support\Filesystem;
 use Laradic\Support\Path;
-use Laradic\Support\Traits\EventDispatcherTrait;
+use Laradic\Support\Traits\EventDispatcher;
 use Themes;
 
 /**
@@ -26,7 +26,7 @@ use Themes;
  */
 class Extension implements ExtensionContract, ArrayAccess
 {
-    use EventDispatcherTrait;
+    use EventDispatcher;
 
     /** @var \Laradic\Extensions\ExtensionFactory */
     protected $extensions;
