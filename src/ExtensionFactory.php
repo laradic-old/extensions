@@ -11,16 +11,14 @@
 namespace Laradic\Extensions;
 
 use ArrayAccess;
-use Debugger;
-use Illuminate\Contracts\Foundation\Application;
+use Config;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Collection;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
-use Laradic\Support\Filesystem;
-use Laradic\Support\Path;
 use Laradic\Support\Sorter;
-use Laradic\Support\TemplateParser;
+use Laradic\Support\Traits\DotArrayAccess;
 
 /**
  * Class ExtensionCollection
@@ -29,6 +27,29 @@ use Laradic\Support\TemplateParser;
  */
 class ExtensionFactory implements ArrayAccess, ExtensionsContract
 {
+    use DotArrayAccess;
+
+    /**
+     * {@inheritDoc}
+     */
+    protected function getArrayAccessor()
+    {
+        return 'extensions';
+    }
+
+    /** @var Extension[] */
+    protected $extensions;
+
+    /**
+     * get extensions value
+     *
+     * @return Extension[]
+     */
+    public function getExtensions()
+    {
+        return $this->extensions;
+    }
+
 
     /** @var \Laradic\Support\Filesystem */
     protected $files;
@@ -39,18 +60,22 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     /** @var \Illuminate\Foundation\Application */
     protected $app;
 
-    /** @var \Illuminate\Support\Collection */
-    protected $extensions;
 
     /** @var \Illuminate\Database\ConnectionInterface */
     protected $connection;
 
     protected $resolver;
 
+    protected $sorter;
+
+    protected $records;
+
+    protected $defaultAttributes = [ ];
+
     /**
      * Instanciates the class
      *
-     * @param \Illuminate\Contracts\Foundation\Application     $app
+     * @param \Illuminate\Foundation\Application               $app
      * @param \Laradic\Support\Filesystem                      $files
      * @param \Laradic\Extensions\ExtensionFileFinder          $finder
      * @param \Illuminate\Database\ConnectionResolverInterface $resolver
@@ -58,104 +83,58 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      */
     public function __construct(
         Application $app,
-        Filesystem $files,
         ExtensionFileFinder $finder,
         ConnectionResolverInterface $resolver
     ) {
         $this->resolver   = $resolver;
         $this->connection = $resolver->connection($resolver->getDefaultConnection());
         $this->app        = $app;
-        $this->files      = $files;
-        $this->finder     = $finder;
 
-        $this->extensions = new Collection();
+        $this->finder = $finder;
+
+        $this->defaultAttributes = Config::get('laradic/extensions::defaultExtensionAttributes');
+        $this->sorter            = new Sorter();
+        $this->extensions        = [ ];
     }
 
+
     /**
-     * get
+     * query on the extension table
      *
-     * @param string $slug
-     * @return Extension
+     * @return \Illuminate\Database\Query\Builder
      */
-    public function get($slug)
+    protected function query()
     {
-        return $this->extensions->get($slug);
+        return $this->resolver->connection()->table(Config::get('laradic/extensions::table'));
     }
 
-    /**
-     * has
-     *
-     * @param mixed $slug
-     * @return bool
-     */
-    public function has($slug)
+    public function updateAllRecords()
     {
-        return $this->extensions->has($slug);
-    }
-
-    /**
-     * all
-     *
-     * @return Extension[]
-     */
-    public function all()
-    {
-        return $this->extensions->all();
-    }
-
-    /**
-     * getTemplateParser
-     *
-     * @param null $sourcePath
-     * @return \Laradic\Support\TemplateParser
-     */
-    public function getTemplateParser($sourcePath = null)
-    {
-        $sourcePath = is_null($sourcePath) ? realpath(__DIR__ . '/resources/stubs') : $sourcePath;
-
-        return new TemplateParser($this->app->make('files'), $sourcePath);
-    }
-
-    /**
-     * Checks if an extension is installed
-     *
-     * @param $slug
-     * @return bool
-     */
-    public function isInstalled($slug)
-    {
-        if ( ! $this->has($slug) )
+        $this->records = [ ];
+        foreach ( $this->query()->get() as $record )
         {
-            return false;
+            $this->records[ $record->slug ] = $record->installed;
         }
-
-        return $this->get($slug)->isInstalled();
     }
 
-    /**
-     * Adds a path to include while searching for extensions
-     *
-     * @param string $path The absolute path to the directory
-     */
-    public function addPath($path)
+    protected function dbGetBySlug($slug)
     {
-        $this->finder->addPath($path);
+        return $this->query()->where('slug', '=', $slug)->first();
     }
 
-    /**
-     * Creates an extension instance using the extension.php file
-     *
-     * @param string $extensionFilePath Path to the extension.php file
-     * @return \Laradic\Extensions\Extension
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
-     */
-    public function createFromFile($extensionFilePath)
+    protected function dbCreate($slug)
     {
-        $attributes = $this->files->getRequire($extensionFilePath);
+        return $this->query()->insert([ 'slug' => $slug, 'installed' => 0 ]);
+    }
 
-        return $this->make()
-            ->setPath(dirname($extensionFilePath))
-            ->setAttributes($attributes);
+    protected function dbInstall($slug)
+    {
+        $this->query()->where('slug', '=', $slug)->update([ 'installed' => 1 ]);
+    }
+
+    protected function dbUninstall($slug)
+    {
+        $this->query()->where('slug', '=', $slug)->update([ 'installed' => 0 ]);
     }
 
     /**
@@ -163,124 +142,97 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      *
      * @return Extension
      */
-    public function make()
+    protected function register($attributes)
     {
-        return new Extension($this, $this->files);
+        $attributes             = array_replace_recursive($this->defaultAttributes, $attributes);
+        $attributes[ 'sorter' ] =& $this->sorter;
+
+        return BaseExtension::make($this->app, $this, $attributes);
     }
+
+    public function get($slug)
+    {
+        return $this->extensions[ $slug ];
+    }
+
+    public function has($slug)
+    {
+        return isset($this->extensions[ $slug ]);
+    }
+
+    public function all()
+    {
+        return $this->extensions;
+    }
+
 
     /**
      * Finds all extensions and registers them
      *
      * @return $this
      */
-    public function locateAndRegisterAll()
+    public function findAndRegisterAll()
     {
-        foreach ( $this->finder->findAll() as $extensionFilePath )
-        {
-            $extension = $this->createFromFile($extensionFilePath);
-            $this->extensions->put($extension->getSlug(), $extension);
-        }
+        $this->updateAllRecords();
 
-        foreach ( $this->getSortedByDependency()->all() as $extension )
+        $found = $this->finder->findAll();
+
+        foreach ( $found as $slug => $attributes )
         {
-            $this->register($extension);
+            if ( ! isset($this->records[ $slug ]) )
+            {
+                $this->dbCreate($slug);
+            }
+
+            if ( ! isset($this->extensions[ $slug ]) )
+            {
+                $dependencies = (isset($attributes[ 'dependencies' ]) and is_array($attributes[ 'dependencies' ])) ? $attributes[ 'dependencies' ] : [ ];
+                $this->sorter->addItem($slug, $dependencies);
+                $this->extensions[ $slug ] = $this->register($attributes);
+            }
         }
 
         return $this;
     }
 
-    /**
-     * register
-     *
-     * @param Extension|string $extension An Extension instance or extension slug
-     * @return $this
-     */
-    public function register($extension)
+
+    public function install(Extension $extension)
     {
-
-        if ( ! $extension instanceof Extension and ! $this->has($extension))
-        {
-            $extension = $this->createFromFile($extension);
-        }
-        elseif ( ! $extension instanceof Extension and $this->has($extension) )
-        {
-            $extension = $this->get($extension);
-        }
-        $extension->register();
-
-        return $this;
     }
 
-    /**
-     * Sorts all registered extensions by dependency
-     *
-     * @return $this
-     */
-    public function sortByDependencies()
+    public function canInstall(Extension $extension)
     {
-        $this->extensions = $this->getSortedByDependency();
-
-        return $this;
+        $this->sorter->sort()
     }
 
-    public function getSortedByDependency()
+    public function isInstalled(Extension $extension)
     {
-        $sorter = new Sorter();
-        foreach ( $this->all() as $extension )
-        {
-            $sorter->addItem($extension->getSlug(), $extension->getDependencies());
-        }
-        $extensions = [ ];
-        $sorted     = $sorter->sort();
-
-        foreach ( $sorted as $slug )
-        {
-            $extensions[ $slug ] = $this->extensions->get($slug);
-        }
-
-        return new Collection($extensions);
+        return isset($this->records[ $extension->getSlug() ]) and $this->records[ $extension->getSlug() ] === 1;
     }
 
-    public function runSeed($filePath, $className = null)
+    public function uninstall(Extension $extension)
+    {
+    }
+
+    public function canUninstall(Extension $extension)
+    {
+    }
+
+    public function seed(Extension $extension)
+    {
+    }
+
+    public function migrate(Extension $extension)
+    {
+    }
+
+    protected function runSeed($filePath, $className = null)
     {
         $seeder = $this->app->make('seeder');
         $this->files->requireOnce($filePath);
         $className = isset($className) ? $className : Path::getFilenameWithoutExtension($filePath);
         $seeder->call($className);
         #Debugger::dump("Seeded $filePath / $className");
-    }
-
-    public function updateAllRecords()
-    {
-        foreach ( $this->all() as $extension )
-        {
-            $extension->updateRecord();
-        }
-    }
-
-    protected function dbQuery()
-    {
-        return $this->connection->table('extensions');
-    }
-
-    public function dbGetBySlug($slug)
-    {
-        return $this->dbQuery()->where('slug', '=', $slug)->first();
-    }
-
-    public function dbCreate($slug)
-    {
-        return $this->dbQuery()->insert([ 'slug' => $slug ]);
-    }
-
-    public function dbInstall($slug)
-    {
-        $this->dbQuery()->where('slug', '=', $slug)->update([ 'installed' => 1 ]);
-    }
-
-    public function dbUninstall($slug)
-    {
-        $this->dbQuery()->where('slug', '=', $slug)->update([ 'installed' => 0 ]);
     }
 
 
@@ -342,16 +294,6 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     }
 
     /**
-     * Get the value of files
-     *
-     * @return \Illuminate\Filesystem\Filesystem
-     */
-    public function getFiles()
-    {
-        return $this->files;
-    }
-
-    /**
      * Get the value of app
      *
      * @return \Illuminate\Foundation\Application
@@ -362,57 +304,15 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     }
 
     /**
-     * Determine if an item exists at an offset.
+     * get installer value
      *
-     * @param  mixed $key
-     * @return bool
+     * @return \Laradic\Extensions\Installer
      */
-    public function offsetExists($key)
+    public function getInstaller()
     {
-        return $this->has($key);
+        return $this->installer;
     }
 
-    /**
-     * offsetGet
-     *
-     * @param string $slug
-     * @return \Laradic\Extensions\Extension
-     */
-    public function offsetGet($slug)
-    {
-        return $this->get($slug);
-    }
 
-    /**
-     * Set the item at a given offset.
-     *
-     * @param  string                        $slug
-     * @param  \Laradic\Extensions\Extension $extension
-     * @return void
-     */
-    public function offsetSet($slug, $extension)
-    {
-        if ( is_array($slug) )
-        {
-            foreach ( $slug as $innerKey => $innerValue )
-            {
-                $this->extensions->put($innerKey, $innerValue);
-            }
-        }
-        else
-        {
-            $this->extensions->put($slug, $extension);
-        }
-    }
 
-    /**
-     * Unset the item at a given offset.
-     *
-     * @param  string $slug
-     * @return void
-     */
-    public function offsetUnset($slug)
-    {
-        $this->extensions->put($slug, null);
-    }
 }

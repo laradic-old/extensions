@@ -7,6 +7,11 @@
  */
 namespace Laradic\Extensions;
 
+use Config;
+use Illuminate\Database\ConnectionResolverInterface;
+use Laradic\Support\Filesystem;
+use Laradic\Support\Path;
+
 /**
  * This is the Installer.
  *
@@ -19,36 +24,26 @@ namespace Laradic\Extensions;
  */
 class Installer
 {
-    protected $extensions;
+    protected $resolver;
     protected $finder;
+    protected $builder;
+    protected $records;
 
     /** Instantiates the class
      *
-     * @param \Laradic\Extensions\ExtensionFactory    $extensions
-     * @param \Laradic\Extensions\ExtensionFileFinder $finder
+     * @param \Laradic\Extensions\ExtensionFactory             $extensions
+     * @param \Illuminate\Database\ConnectionResolverInterface $resolver
+     * @param \Laradic\Support\Filesystem                      $files
+     * @param \Laradic\Extensions\ExtensionFileFinder          $finder
      */
-    public function __construct(ExtensionFactory $extensions)
+    public function __construct(ExtensionFileFinder $finder, ConnectionResolverInterface $resolver)
     {
-        $this->extensions = $extensions;
+        $this->finder = $finder;
+        $this->resolver = $resolver;
+        $this->updateAllRecords();
     }
 
-    protected function resolveExtension($extension)
-    {
-        if(is_string($extension) and !$this->extensions->has($extension))
-        {
-            $this->extensions->locateAndRegisterAll();
-        }
 
-        if(is_string($extension))
-        {
-            $extension = $this->extensions->get($extension);
-        }
 
-        if(!$extension instanceof Extension)
-        {
-            throw new \Exception("Could not resolve extension [$extension]");
-        }
 
-        return $extension;
-    }
 }

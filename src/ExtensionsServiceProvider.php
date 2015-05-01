@@ -31,11 +31,14 @@ class ExtensionsServiceProvider extends ServiceProvider
 
     protected $provides = [ 'extensions', 'extensions.finder', 'extensions.generator' ];
 
+    /**
+     * @var \Illuminate\Database\Connection
+     */
     protected $connection;
 
     protected $installed = false;
 
-    public function boot()
+    public function boot2()
     {
         /** @var \Illuminate\Foundation\Application $app */
         $app = parent::boot();
@@ -62,11 +65,11 @@ class ExtensionsServiceProvider extends ServiceProvider
         /** @var \Illuminate\Foundation\Application $app */
         $app = parent::register();
 
+        $config = $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__ . '/../resources/config'));
+
         $db               = $app->make('db');
         $this->connection = $db->connection($db->getDefaultConnection());
-        $this->installed  = \Schema::setConnection($this->connection)->hasTable('extensions');
-
-        $this->addConfigComponent('laradic/extensions', 'laradic/extensions', realpath(__DIR__ . '/../resources/config'));
+        $this->installed  = \Schema::setConnection($this->connection)->hasTable($config['table']);
 
         if ( ! $this->installed )
         {
@@ -75,6 +78,9 @@ class ExtensionsServiceProvider extends ServiceProvider
 
         $this->registerExtensions();
         $this->registerGenerator();
+
+
+        $app->make('extensions')->findAndRegisterAll();
     }
 
     protected function registerExtensions()
@@ -90,14 +96,14 @@ class ExtensionsServiceProvider extends ServiceProvider
             return $finder;
         });
 
-        $connection = $this->connection;
-        $app->singleton('extensions', function (Application $app) use ($connection)
+
+        $app->singleton('extensions', function (Application $app)
         {
-            return new ExtensionFactory($app, $app->make('files'), $app->make('extensions.finder'), $app->make('db'));
+            return new ExtensionFactory($app, $app->make('extensions.finder'), $app->make('db'));
         });
         $app->bind('Laradic\Extensions\Contracts\Extensions', 'extensions');
         $this->alias('Extensions', 'Laradic\Extensions\Facades\Extensions');
-        $app->make('extensions')->locateAndRegisterAll();
+
     }
 
     protected function registerGenerator()

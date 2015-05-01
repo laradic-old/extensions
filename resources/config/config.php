@@ -4,6 +4,7 @@ return array(
     'paths'                      => array(
         base_path('workbench')
     ),
+    'table' => 'extensions',
     'defaultExtensionAttributes' => array(
         'paths'        => array(
             'config'     => 'resources/config',

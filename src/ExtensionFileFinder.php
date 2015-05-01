@@ -4,7 +4,9 @@
  */
 namespace Laradic\Extensions;
 
+use Config;
 use Illuminate\Filesystem\Filesystem;
+use Laradic\Extensions\Exceptions\ExtensionNotFoundException;
 use Laradic\Support\Path;
 use Symfony\Component\Finder\Finder as BaseFinder;
 
@@ -22,48 +24,84 @@ class ExtensionFileFinder
 
     protected $files;
 
-    protected $paths = [];
+    protected $paths = [ ];
+
+    protected $found = [ ];
+
+
+    /**
+     * @var \Laradic\Support\Sorter
+     */
+    protected $sorter;
 
     public function __construct(Filesystem $files, array $paths = array())
     {
-        $this->files = $files;
-        $this->paths = $paths;
+        $this->files             = $files;
+        $this->paths             = $paths;
     }
 
-    public function findInPath($path)
+    protected function findInPath($path)
     {
         if ( ! $filePaths = $this->files->glob(Path::join($path, '*/*/extension.php')) )
         {
-            return [];
+            return [ ];
         }
 
         return $filePaths;
+    }
+
+    protected function createExtensionFromFile($filePath)
+    {
+    }
+
+    public function find($slug)
+    {
+        $found = $this->findAll();
+        if ( isset($found[ $slug ]) )
+        {
+            return $found[ $slug ];
+        }
+        throw new ExtensionNotFoundException($slug);
     }
 
     public function findAll()
     {
-        $filePaths = [];
-        foreach($this->paths as $path)
+        $found = [ ];
+        foreach ( $this->paths as $path )
         {
-            $filePaths = array_merge($filePaths, $this->findInPath($path));
+            foreach ( $this->findInPath($path) as $filePath )
+            {
+                $attributes = $this->files->getRequire($filePath);
+                if ( isset($found[ $attributes[ 'slug' ] ]) )
+                {
+                    throw new \Exception('Duplicate slug for extension [' . $attributes[ 'slug' ] . '] found');
+                }
+                else
+                {
+                    $attributes[ 'path' ]           = path_get_directory($filePath);
+                    $found[ $attributes[ 'slug' ] ] = $attributes;
+                }
+            }
         }
-        return $filePaths;
-    }
 
+        return $found;
+    }
 
     public function addPath($path)
     {
         if ( is_array($path) )
         {
-            foreach ($path as $p)
+            foreach ( $path as $p )
             {
                 $this->addPath($p);
             }
         }
         else
         {
-            $this->paths[] = $path;
+            $this->paths[ ] = $path;
         }
+
+        return $this;
     }
 
     /**
