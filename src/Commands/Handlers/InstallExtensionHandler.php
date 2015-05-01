@@ -1,22 +1,19 @@
-<?php namespace Laradic\Extensions\Handlers\Commands;
+<?php namespace Laradic\Extensions\Commands\Handlers;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Queue\InteractsWithQueue;
+use Laradic\Extensions\Commands\InstallExtension;
 use Laradic\Extensions\Commands\UninstallExtension;
-use Laradic\Extensions\Contracts\Extensions;
-use Laradic\Extensions\Events\ExtensionUninstalled;
 use Laradic\Extensions\Traits\ExtensionDbRecordTrait;
 use Symfony\Component\VarDumper\VarDumper;
 
 /**
  * {@inheritDoc}
  */
-class UninstallExtensionHandler extends Handler
+class InstallExtensionHandler extends Handler
 {
     use ExtensionDbRecordTrait;
-
-
 
 
     /**
@@ -25,7 +22,7 @@ class UninstallExtensionHandler extends Handler
      * @param  UninstallExtension $command
      * @throws \Exception
      */
-    public function handle(UninstallExtension $command)
+    public function handle(InstallExtension $command)
     {
         /** @var \Illuminate\Foundation\Application $app */
         $app        = $this->app;
@@ -34,7 +31,7 @@ class UninstallExtensionHandler extends Handler
 
         #$extension->register();
         $app->register($extension);
-        $extension->onUninstall();
+        $extension->onInstall();
 
         // Dependency checking
         $sorter     = $extensions->getSorter();
@@ -45,18 +42,22 @@ class UninstallExtensionHandler extends Handler
         {
             if ( $extensions->get($_slug)->isInstalled() )
             {
-                throw new \Exception("Could not uninstall {$extension->getSlug()}, there are other extensions installed depending on it. ");
+                throw new \Exception("Could not install {$extension->getSlug()}, there are other extensions installed depending on it. ");
             }
         }
 
         // Migrations
         $paths = array_merge($extension->getMigrations(), [ path_join($extension->getPath(), 'resources/migrations') ]);
-        $this->runMigrations($extension, $paths, 'down');
+        $this->runMigrations($extension, $paths, 'up');
         $this->connection = app('db')->connection();
 
+        $seedPaths = array_merge($extension->getSeeds(), [ path_join($extension->getPath(), 'resources/seeds') ]);
+        $this->runSeeders($extension, $seedPaths);
+
+
         // Writeout
-        $this->recordUninstall($slug);
-        event(new ExtensionUninstalled($extension));
+        $this->recordInstall($slug);
+        event(new ExtensionInstalled($extension));
         $extension->onInstalled();
     }
 

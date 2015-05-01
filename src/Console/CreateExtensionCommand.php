@@ -47,6 +47,7 @@ class CreateExtensionCommand extends Command
 
     public function fire()
     {
+        throw new \Exception("Deprecated");
         $slug = $this->argument('slug');
         $path = $this->argument('path');
 

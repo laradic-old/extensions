@@ -16,7 +16,7 @@ class BusServiceProvider extends ServiceProvider {
 		$dispatcher->mapUsing(function($command)
 		{
 			return Dispatcher::simpleMapping(
-				$command, 'Laradic\Extensions\Commands', 'Laradic\Extensions\Handlers\Commands'
+				$command, 'Laradic\Extensions\Commands', 'Laradic\Extensions\Commands\Handlers'
 			);
 		});
 	}

@@ -5,7 +5,7 @@
  * MIT License and copyright information bundled with this package
  * in the LICENSE file or visit http://radic.mit-license.com
  */
-namespace Laradic\Extensions\Handlers\Commands;
+namespace Laradic\Extensions\Commands\Handlers;
 
 
 use Debugger;
@@ -73,7 +73,7 @@ class Handler
     protected function runMigrations(Extension $extension, $paths, $way = 'up')
     {
         $migrator = $this->migrator;
-        $files = $this->files;
+        $files    = $this->files;
         if ( ! isset($paths) or ! is_array($paths) )
         {
             return;
@@ -82,7 +82,7 @@ class Handler
         foreach ( $paths as $path )
         {
             $path = $this->resolvePath($extension, $path);
-            if( $path === false)
+            if ( $path === false )
             {
                 continue;
             }
@@ -125,30 +125,30 @@ class Handler
     }
 
 
-    protected function runSeeders(Extension $extension, array $paths = [])
+    protected function runSeeders(Extension $extension, array $paths = [ ])
     {
         if ( ! isset($paths) or ! is_array($paths) )
         {
             return;
         }
 
-        foreach ($paths as $path)
+        foreach ( $paths as $path )
         {
             $path = $this->resolvePath($extension, $path);
-            if( $path === false)
+            if ( $path === false )
             {
                 continue;
             }
 
             $seederFiles = $this->files->glob(path_join($path, '*Seeder.php'));
 
-            foreach ($seederFiles as $file)
+            foreach ( $seederFiles as $file )
             {
                 $this->runSeed($file);
             }
         }
 
-        foreach ($extension->getSeeds() as $seedFilePath => $seedClassName)
+        foreach ( $extension->getSeeds() as $seedFilePath => $seedClassName )
         {
             $this->runSeed(
                 is_int($seedFilePath) ? $seedClassName : $seedFilePath,
@@ -170,21 +170,22 @@ class Handler
     protected function resolvePath(Extension $extension, $path)
     {
         $files = $this->files;
-        if ( $files->isDirectory($path)  )
+        if ( $files->isDirectory($path) )
         {
             return $path;
         }
-        elseif(path_is_relative($path))
+        elseif ( path_is_relative($path) )
         {
-            if($files->isDirectory(path_join($extension->getPath(), $path)))
+            if ( $files->isDirectory(path_join($extension->getPath(), $path)) )
             {
                 return path_join($extension->getPath(), $path);
             }
-            elseif($files->isDirectory(base_path($path)))
+            elseif ( $files->isDirectory(base_path($path)) )
             {
                 return base_path($path);
             }
         }
+
         return false;
     }
 

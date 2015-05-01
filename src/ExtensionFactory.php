@@ -11,14 +11,12 @@
 namespace Laradic\Extensions;
 
 use ArrayAccess;
-use Config;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Collection;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
 use Laradic\Extensions\Traits\ExtensionDbRecordTrait;
-use Laradic\Support\Path;
 use Laradic\Support\Sorter;
 use Laradic\Support\Traits\DotArrayAccess;
 use Laradic\Support\Traits\EventDispatcher;
@@ -115,10 +113,8 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      * Instanciates the class
      *
      * @param \Illuminate\Contracts\Foundation\Application     $app
-     * @param \Laradic\Support\Filesystem                      $files
      * @param \Laradic\Extensions\ExtensionFileFinder          $finder
      * @param \Illuminate\Database\ConnectionResolverInterface $resolver
-     * @internal param \Illuminate\Database\ConnectionInterface $connection
      */
     public function __construct(
         Application $app,
@@ -129,11 +125,10 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
         $this->app      = $app;
         $this->finder   = $finder;
 
-        $this->connection        = $resolver->connection();
-        $this->files             = $app->make('files');
-        $this->defaultAttributes = Config::get('laradic/extensions::defaultExtensionAttributes');
-        $this->extensions        = [ ];
-        $this->records           = [ ];
+        $this->connection = $resolver->connection();
+        $this->files      = $app->make('files');
+        $this->extensions = [ ];
+        $this->records    = [ ];
     }
 
 
@@ -144,8 +139,8 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      */
     protected function make($attributes)
     {
-        $attributes             = array_replace_recursive($this->defaultAttributes, $attributes);
-        $class                  = $attributes[ 'class' ];
+        $class = $attributes[ 'class' ];
+
         return new $class($this->app, $this, $attributes);
     }
 
@@ -230,9 +225,6 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
 
         return new Collection($extensions);
     }
-
-
-
 
 
     /**
