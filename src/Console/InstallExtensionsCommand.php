@@ -4,6 +4,8 @@
  */
 namespace Laradic\Extensions\Console;
 
+use Illuminate\Foundation\Bus\DispatchesCommands;
+use Laradic\Extensions\Commands\InstallExtension;
 use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
 use Laradic\Console\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -19,11 +21,11 @@ use Symfony\Component\Console\Input\InputArgument;
  */
 class InstallExtensionsCommand extends Command
 {
-    use ExtensionCommandTrait;
+    use ExtensionCommandTrait, DispatchesCommands;
 
     protected $name = 'extensions:install';
 
-    protected $description = 'List all extensions.';
+    protected $description = 'Install one or several extensions';
 
     public function fire()
     {
@@ -32,7 +34,7 @@ class InstallExtensionsCommand extends Command
 
         if ( ! $slug = $this->argument('slug') )
         {
-            foreach($extensions->sortByDependencies()->all() as $extension)
+            foreach($extensions->getSortedByDependency()->all() as $extension)
             {
                 $slug = $extension->getSlug();
                 $answer = config('app.debug') ? true : $this->confirm('Do you want to install ' . $this->colorize(['bold', 'black'], $slug), true);
@@ -47,34 +49,19 @@ class InstallExtensionsCommand extends Command
         }
         else
         {
-            $this->install($slug);
+            $extension = $this->getExtensions()->get($slug);
+            if(!$extension->isInstalled())
+            {
+                $c = new InstallExtension($this->getExtensions()->get($slug));
+                $this->dispatch($c);
+            }
+            else
+            {
+                $this->error('Extension could not be installed, the extension was alreayd installed');
+            }
         }
     }
 
-    protected function install($slug)
-    {
-        $extensions = $this->getExtensions();
-        if ( ! $extensions->has($slug) )
-        {
-            return $this->error("Extension [$slug] does not exist");
-        }
-        $extension = $extensions->get($slug);
-
-        if(!$extension->canInstall())
-        {
-            return $this->error("Extension [$slug] can not be installed. Are all dependencies installed?");
-        }
-
-        if ( ! $extension->isInstalled() )
-        {
-            $extension->install();
-            $this->info("Extension [$slug] installed");
-        }
-        else
-        {
-            $this->comment("Extension [$slug] already installed");
-        }
-    }
 
     public function getArguments()
     {

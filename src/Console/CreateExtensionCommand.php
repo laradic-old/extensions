@@ -27,7 +27,7 @@ class CreateExtensionCommand extends Command
 
     protected $name = 'extensions:create';
 
-    protected $description = 'Create an extensions.';
+    protected $description = 'Create a new extension';
 
 
     public function fire2()

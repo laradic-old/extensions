@@ -5,6 +5,7 @@
 namespace Laradic\Extensions\Console;
 
 use Laradic\Console\Command;
+use Laradic\Support\String;
 
 /**
  * Class ListExtensionsCommand
@@ -18,7 +19,7 @@ use Laradic\Console\Command;
 class ListExtensionsCommand extends Command
 {
     protected $name = 'extensions:list';
-    protected $description = 'List all extensions.';
+    protected $description = 'List all local extensions';
 
     public function fire()
     {
@@ -28,10 +29,16 @@ class ListExtensionsCommand extends Command
         foreach($extensions->all() as $extension)
         {
             /** @var \Laradic\Extensions\Extension $extension */
-            $rows[] = [$extension->getName(), $extension->getSlug(), $extension->getPath(), $extension->isInstalled() ? $this->colorize('green', 'Y') : $this->colorize('yellow', 'N')];
+            $rows[] = [
+                $extension->getName(),
+                $extension->getSlug(),
+                $extension->getVersion()->valid(),
+                (string) String::removeLeft($extension->getPath(), base_path().'/'),
+                $extension->isInstalled() ? $this->colorize('green', 'Y') : $this->colorize('yellow', 'N')
+            ];
         }
 
-        $this->table(['Name', 'Slug', 'Path', 'Installed'], $rows);
+        $this->table(['Name', 'Slug', 'Version', 'Path', 'Installed'], $rows);
 
     }
 }

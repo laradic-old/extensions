@@ -4,10 +4,10 @@
  */
 namespace Laradic\Extensions;
 
-use Config;
 use Illuminate\Filesystem\Filesystem;
 use Laradic\Extensions\Exceptions\ExtensionNotFoundException;
 use Laradic\Support\Path;
+use Laradic\Support\String;
 use Symfony\Component\Finder\Finder as BaseFinder;
 
 /**
@@ -26,32 +26,20 @@ class ExtensionFileFinder
 
     protected $paths = [ ];
 
-    protected $found = [ ];
-
-
-    /**
-     * @var \Laradic\Support\Sorter
-     */
-    protected $sorter;
-
     public function __construct(Filesystem $files, array $paths = array())
     {
-        $this->files             = $files;
-        $this->paths             = $paths;
+        $this->files = $files;
+        $this->paths = $paths;
     }
 
-    protected function findInPath($path)
+    public function findInPath($path)
     {
-        if ( ! $filePaths = $this->files->glob(Path::join($path, '*/*/extension.php')) )
+        if ( ! $filePaths = $this->files->glob(Path::join($path, '*/*/*Extension.php')) )
         {
             return [ ];
         }
 
         return $filePaths;
-    }
-
-    protected function createExtensionFromFile($filePath)
-    {
     }
 
     public function find($slug)
@@ -71,21 +59,26 @@ class ExtensionFileFinder
         {
             foreach ( $this->findInPath($path) as $filePath )
             {
-                $attributes = $this->files->getRequire($filePath);
-                if ( isset($found[ $attributes[ 'slug' ] ]) )
+                $this->files->requireOnce($filePath);
+                $classPath = (string)String::removeLeft($filePath, $path . '/')->removeRight('.php')->namespacedStudly();
+                $info      = forward_static_call([ $classPath, 'getInfo' ]);
+                if ( isset($found[ $info[ 'slug' ] ]) )
                 {
-                    throw new \Exception('Duplicate slug for extension [' . $attributes[ 'slug' ] . '] found');
+                    throw new \Exception('Duplicate slug for extension [' . $info[ 'slug' ] . '] found');
                 }
                 else
                 {
-                    $attributes[ 'path' ]           = path_get_directory($filePath);
-                    $found[ $attributes[ 'slug' ] ] = $attributes;
+                    // $attributes[ 'namespace' ] = String::namespacedStudly($attributes['slug']);
+                    $info[ 'path' ]           = path_get_directory($filePath);
+                    $info[ 'class' ]          = $classPath;
+                    $found[ $info[ 'slug' ] ] = $info;
                 }
             }
         }
 
         return $found;
     }
+
 
     public function addPath($path)
     {
@@ -100,8 +93,6 @@ class ExtensionFileFinder
         {
             $this->paths[ ] = $path;
         }
-
-        return $this;
     }
 
     /**

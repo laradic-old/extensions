@@ -12,13 +12,17 @@ namespace Laradic\Extensions;
 
 use ArrayAccess;
 use Config;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\ConnectionResolverInterface;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Collection;
 use Laradic\Extensions\Contracts\Extensions as ExtensionsContract;
+use Laradic\Extensions\Traits\ExtensionDbRecordTrait;
+use Laradic\Support\Path;
 use Laradic\Support\Sorter;
 use Laradic\Support\Traits\DotArrayAccess;
+use Laradic\Support\Traits\EventDispatcher;
+use Symfony\Component\VarDumper\VarDumper;
 
 /**
  * Class ExtensionCollection
@@ -27,31 +31,60 @@ use Laradic\Support\Traits\DotArrayAccess;
  */
 class ExtensionFactory implements ArrayAccess, ExtensionsContract
 {
-    use DotArrayAccess;
+
+    use DotArrayAccess, EventDispatcher, ExtensionDbRecordTrait;
 
     /**
      * {@inheritDoc}
      */
     protected function getArrayAccessor()
     {
-        return 'extensions';
+        return 'attributes';
     }
 
     /** @var Extension[] */
-    protected $extensions;
+    protected $extensions = [ ];
 
     /**
-     * get extensions value
+     * get
+     *
+     * @param string $slug
+     * @return Extension
+     */
+    public function get($slug)
+    {
+        return $this->extensions[ $slug ];
+    }
+
+    /**
+     * has
+     *
+     * @param mixed $slug
+     * @return bool
+     */
+    public function has($slug)
+    {
+        return isset($this->extensions[ $slug ]);
+    }
+
+    /**
+     * all
      *
      * @return Extension[]
      */
-    public function getExtensions()
+    public function all()
     {
         return $this->extensions;
     }
 
+    public function on($eventName, \Closure $cb)
+    {
+        $this->registerEvent($eventName, $cb);
+    }
 
-    /** @var \Laradic\Support\Filesystem */
+    /**
+     * @var \Laradic\Support\Filesystem
+     */
     protected $files;
 
     /** @var \Laradic\Extensions\ExtensionFileFinder */
@@ -60,22 +93,28 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     /** @var \Illuminate\Foundation\Application */
     protected $app;
 
-
     /** @var \Illuminate\Database\ConnectionInterface */
     protected $connection;
 
+    /**
+     * @var \Illuminate\Database\ConnectionResolverInterface
+     */
     protected $resolver;
 
-    protected $sorter;
-
+    /**
+     * @var array
+     */
     protected $records;
 
-    protected $defaultAttributes = [ ];
+    /**
+     * @var mixed
+     */
+    protected $defaultAttributes;
 
     /**
      * Instanciates the class
      *
-     * @param \Illuminate\Foundation\Application               $app
+     * @param \Illuminate\Contracts\Foundation\Application     $app
      * @param \Laradic\Support\Filesystem                      $files
      * @param \Laradic\Extensions\ExtensionFileFinder          $finder
      * @param \Illuminate\Database\ConnectionResolverInterface $resolver
@@ -86,85 +125,76 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
         ExtensionFileFinder $finder,
         ConnectionResolverInterface $resolver
     ) {
-        $this->resolver   = $resolver;
-        $this->connection = $resolver->connection($resolver->getDefaultConnection());
-        $this->app        = $app;
+        $this->resolver = $resolver;
+        $this->app      = $app;
+        $this->finder   = $finder;
 
-        $this->finder = $finder;
-
+        $this->connection        = $resolver->connection();
+        $this->files             = $app->make('files');
         $this->defaultAttributes = Config::get('laradic/extensions::defaultExtensionAttributes');
-        $this->sorter            = new Sorter();
         $this->extensions        = [ ];
+        $this->records           = [ ];
     }
 
-
-    /**
-     * query on the extension table
-     *
-     * @return \Illuminate\Database\Query\Builder
-     */
-    protected function query()
-    {
-        return $this->resolver->connection()->table(Config::get('laradic/extensions::table'));
-    }
-
-    public function updateAllRecords()
-    {
-        $this->records = [ ];
-        foreach ( $this->query()->get() as $record )
-        {
-            $this->records[ $record->slug ] = $record->installed;
-        }
-    }
-
-    protected function dbGetBySlug($slug)
-    {
-        return $this->query()->where('slug', '=', $slug)->first();
-    }
-
-    protected function dbCreate($slug)
-    {
-        return $this->query()->insert([ 'slug' => $slug, 'installed' => 0 ]);
-    }
-
-    protected function dbInstall($slug)
-    {
-        $this->query()->where('slug', '=', $slug)->update([ 'installed' => 1 ]);
-    }
-
-    protected function dbUninstall($slug)
-    {
-        $this->query()->where('slug', '=', $slug)->update([ 'installed' => 0 ]);
-    }
 
     /**
      * make
      *
      * @return Extension
      */
-    protected function register($attributes)
+    protected function make($attributes)
     {
         $attributes             = array_replace_recursive($this->defaultAttributes, $attributes);
-        $attributes[ 'sorter' ] =& $this->sorter;
-
-        return BaseExtension::make($this->app, $this, $attributes);
+        $class                  = $attributes[ 'class' ];
+        return new $class($this->app, $this, $attributes);
     }
 
-    public function get($slug)
+    /**
+     * Checks if an extension is installed
+     *
+     * @param $slug
+     * @return bool
+     */
+    public function isInstalled($slug)
     {
-        return $this->extensions[ $slug ];
+        return isset($this->records[ $slug ]) and $this->records[ $slug ] === 1;
     }
 
-    public function has($slug)
+    protected function findAll()
     {
-        return isset($this->extensions[ $slug ]);
+        $found = $this->finder->findAll();
+        foreach ( $found as $slug => $attributes )
+        {
+            if ( ! isset($this->records[ $slug ]) )
+            {
+                $this->recordCreate($slug);
+            }
+            if ( ! isset($this->extensions[ $slug ]) )
+            {
+                $dependencies                           = (isset($attributes[ 'dependencies' ]) and is_array($attributes[ 'dependencies' ])) ? $attributes[ 'dependencies' ] : [ ];
+                $extension = $this->extensions[ $slug ] = $this->make($attributes);
+            }
+        }
+
+        return $this;
     }
 
-    public function all()
+    /**
+     * registerAll
+     */
+    protected function registerAll()
     {
-        return $this->extensions;
+        foreach ( $this->getSorter()->sort() as $slug )
+        {
+            if ( ! $this->isInstalled($slug) )
+            {
+                continue;
+            }
+            $ex = $this->extensions[ $slug ];
+            $v  = $ex->getVersion();
+            $this->app->register($ex);
+        }
     }
-
 
     /**
      * Finds all extensions and registers them
@@ -173,67 +203,36 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      */
     public function findAndRegisterAll()
     {
-        $this->updateAllRecords();
-
-        $found = $this->finder->findAll();
-
-        foreach ( $found as $slug => $attributes )
-        {
-            if ( ! isset($this->records[ $slug ]) )
-            {
-                $this->dbCreate($slug);
-            }
-
-            if ( ! isset($this->extensions[ $slug ]) )
-            {
-                $dependencies = (isset($attributes[ 'dependencies' ]) and is_array($attributes[ 'dependencies' ])) ? $attributes[ 'dependencies' ] : [ ];
-                $this->sorter->addItem($slug, $dependencies);
-                $this->extensions[ $slug ] = $this->register($attributes);
-            }
-        }
+        $this->updateRecords();
+        $this->findAll();
+        $this->registerAll();
 
         return $this;
     }
 
-
-    public function install(Extension $extension)
+    public function getSorter()
     {
+        $sorter = new Sorter();
+        $sorter->add($this->extensions);
+
+        return $sorter;
     }
 
-    public function canInstall(Extension $extension)
+    public function getSortedByDependency()
     {
-        $this->sorter->sort()
+        $extensions = [ ];
+        $sorted     = $this->getSorter()->sort();
+
+        foreach ( $sorted as $slug )
+        {
+            $extensions[ $slug ] = $this->get($slug);
+        }
+
+        return new Collection($extensions);
     }
 
-    public function isInstalled(Extension $extension)
-    {
-        return isset($this->records[ $extension->getSlug() ]) and $this->records[ $extension->getSlug() ] === 1;
-    }
 
-    public function uninstall(Extension $extension)
-    {
-    }
 
-    public function canUninstall(Extension $extension)
-    {
-    }
-
-    public function seed(Extension $extension)
-    {
-    }
-
-    public function migrate(Extension $extension)
-    {
-    }
-
-    protected function runSeed($filePath, $className = null)
-    {
-        $seeder = $this->app->make('seeder');
-        $this->files->requireOnce($filePath);
-        $className = isset($className) ? $className : Path::getFilenameWithoutExtension($filePath);
-        $seeder->call($className);
-        #Debugger::dump("Seeded $filePath / $className");
-    }
 
 
     /**
@@ -282,7 +281,6 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
         return $this;
     }
 
-
     /**
      * Get the value of finder
      *
@@ -304,13 +302,13 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
     }
 
     /**
-     * get installer value
+     * get files value
      *
-     * @return \Laradic\Extensions\Installer
+     * @return \Laradic\Support\Filesystem
      */
-    public function getInstaller()
+    public function getFiles()
     {
-        return $this->installer;
+        return $this->files;
     }
 
 

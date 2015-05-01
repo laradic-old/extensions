@@ -1,491 +1,291 @@
 <?php
 /**
- * Part of the Radic packages.
+ * Part of the Robin Radic's PHP packages.
+ *
+ * MIT License and copyright information bundled with this package
+ * in the LICENSE file or visit http://radic.mit-license.com
  */
 namespace Laradic\Extensions;
 
 use ArrayAccess;
-use Closure;
-use Config;
-use Debugger;
-use Illuminate\Database\QueryException;
+use Illuminate\Foundation\AliasLoader;
+use Illuminate\Foundation\Application;
+use Laradic\Config\Traits\ConfigProviderTrait;
 use Laradic\Extensions\Contracts\Extension as ExtensionContract;
-use Laradic\Support\Filesystem;
-use Laradic\Support\Path;
-use Laradic\Support\Traits\EventDispatcher;
-use Themes;
+use Laradic\Support\Contracts\Dependable;
+use Laradic\Support\ServiceProvider;
+use Laradic\Support\Traits\DotArrayAccess;
+use Laradic\Support\Traits\DotArrayObjectAccess;
+use Laradic\Themes\Traits\ThemeProviderTrait;
+use vierbergenlars\SemVer\version;
 
 /**
- * Class Extension
+ * This is the BaseExtension class.
  *
- * @package     Laradic\Extensions
- * @author      Robin Radic
- * @license     MIT
- * @copyright   2011-2015, Robin Radic
- * @link        http://radic.mit-license.org
+ * @package        Laradic\Extensions
+ * @version        1.0.0
+ * @author         Robin Radic
+ * @license        MIT License
+ * @copyright      2015, Robin Radic
+ * @link           https://github.com/robinradic
  */
-class Extension implements ExtensionContract, ArrayAccess
+abstract class Extension extends ServiceProvider implements ExtensionContract, ArrayAccess, Dependable
 {
-    use EventDispatcher;
+    use DotArrayAccess, DotArrayObjectAccess,
+        ConfigProviderTrait, ThemeProviderTrait;
 
-    /** @var \Laradic\Extensions\ExtensionFactory */
+
+    /**
+     * getArrayAccessor
+     *
+     * @return mixed
+     */
+    protected function getArrayAccessor()
+    {
+        return 'attributes';
+    }
+
+    protected $attributes = [ ];
+
     protected $extensions;
-
-    /** @var string */
-    protected $slug;
-
-    /** @var string[] */
-    protected $dependencies;
-
-    /** @var string */
-    protected $name;
-
-    /** @var array */
-    protected $attributes;
-
-    /** @var string */
-    protected $path;
-
-    /** @var \StdClass */
-    protected $record;
 
     protected $files;
 
-    /**
-     * Instanciates the class
-     *
-     * @param \Laradic\Extensions\ExtensionFactory $extensions
-     * @internal param \Illuminate\Database\ConnectionInterface $connection
-     * @internal param \Laradic\Extensions\Contracts\ExtensionRepository $repository
-     * @internal param $path
-     * @internal param array $attributes
-     */
-    public function __construct(ExtensionFactory $extensions, Filesystem $files)
+    public function __construct(Application $app, ExtensionFactory $extensions, array $attributes)
     {
+        parent::__construct($app);
         $this->extensions = $extensions;
-        $this->files      = $files;
-    }
-
-
-    //
-    /* Install / Uninstall */
-    //
-    /**
-     * install
-     *
-     * @return bool
-     */
-    public function install()
-    {
-        $this->fireEvent('extension.installing', [$this]);
-        $this->callAttributesClosure('pre_install');
-
-        $this->register(true);
-        if ( ! $this->canInstall() )
-        {
-            return false;
-        }
-
-        if ( $this->handles('migrations') )
-        {
-            $this->runMigrations('up');
-        }
-
-        if ( $this->handles('seeds') )
-        {
-            $this->runSeeders();
-        }
-
-        $this->callAttributesClosure('install');
-        $this->extensions->dbInstall($this->slug);
-        $this->extensions->updateAllRecords();
-        $this->callAttributesClosure('installed');
-        $this->fireEvent('extension.installed', [$this]);
-    }
-
-    /**
-     * uninstall
-     *
-     * @return bool
-     */
-    public function uninstall()
-    {
-        $this->fireEvent('extension.uninstalling', [$this]);
-        $this->callAttributesClosure('pre_uninstall');
-
-        $this->register();
-        if ( ! $this->canUninstall() )
-        {
-            Debugger::dump('can not uninstall ' . $this->slug);
-            return false;
-        }
-
-        if ( $this->handles('migrations') )
-        {
-            $this->runMigrations('down');
-        }
-
-        $this->callAttributesClosure('uninstall');
-        $this->extensions->dbUninstall($this->slug);
-        $this->getExtensions()->updateAllRecords();
-        $this->callAttributesClosure('uninstalled');
-        $this->fireEvent('extension.uninstalled', [$this]);
-    }
-
-    public function canInstall()
-    {
-        foreach ($this->getDependencies() as $dep)
-        {
-            if ( ! $this->extensions->isInstalled($dep) )
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    public function canUninstall()
-    {
-        return empty($this->getInstalledDependants());
+        $this->attributes = $attributes;
+        $this->files      = $extensions->getFiles();
     }
 
     public function isInstalled()
     {
-        return (bool)$this->record->installed;
+        return $this->extensions->isInstalled($this[ 'slug' ]);
     }
 
-    /**
-     * Run Migrations
-     *
-     * @param string $way
-     */
-    protected function runMigrations($way = 'up')
-    {
-        $paths = $this->getPath('migrations');
-        #Debugger::dump(compact('paths'));
-        if ( ! isset($paths) or ! is_array($paths) )
-        {
-            return;
-        }
-
-        /** @var \Illuminate\Foundation\Application $app */
-        $app      = $this->getExtensions()->getApplication();
-        $migrator = $app->make('migrator');
-        $migrator->setConnection($this->extensions->getResolver()->getDefaultConnection());
-
-        foreach ($paths as $path)
-        {
-
-            if ( ! $this->extensions->getFiles()->isDirectory($path) )
-            {
-                continue;
-            }
-
-            $migrationFiles = $migrator->getMigrationFiles($path);
-            if($way === 'down'){
-                $migrationFiles = array_reverse($migrationFiles);
-            }
-
-            $migrator->requireFiles($path, $migrationFiles);
-
-            foreach ($migrationFiles as $migrationFile)
-            {
-
-                $migration = $migrator->resolve($migrationFile);
-
-                #Debugger::dump(compact('path', 'migrationFile', 'way', 'migration'));
-                try
-                {
-                    if ( $way === 'up' )
-                    {
-                        $migration->up();
-                    }
-                    elseif ( $way === 'down' )
-                    {
-                        $migration->down();
-                    }
-                }
-                catch (QueryException $qe)
-                {
-                    Debugger::dump('Error migrating: ' . $qe->getMessage());
-                }
-                catch (\PDOException $pe)
-                {
-                    Debugger::dump('Error migrating: ' . $pe->getMessage());
-                }
-            }
-
-        }
-    }
-
-    protected function runSeeders()
-    {
-        $paths = $this->getPath('seeds');
-        if ( ! isset($paths) or ! is_array($paths) )
-        {
-            return;
-        }
-
-        foreach ($paths as $path)
-        {
-            if ( ! $this->extensions->getFiles()->isDirectory($path) )
-            {
-                return;
-            }
-
-            $seederFiles = $this->files->glob(Path::join($path, '*Seeder.php'));
-
-            foreach ($seederFiles as $file)
-            {
-                $this->extensions->runSeed($file);
-            }
-        }
-
-        foreach ($this['seeds'] as $seedFilePath => $seedClassName)
-        {
-            $this->extensions->runSeed(
-                is_int($seedFilePath) ? $seedClassName : $seedFilePath,
-                is_int($seedFilePath) ? null : $seedClassName
-            );
-        }
-    }
-
-
-    //
-    /* Registering / Booting */
-    //
-
-    public function register($ignoreNotInstalled = false)
-    {
-        $installed = $this->isInstalled();
-
-        if ( ! $this->isInstalled() and $ignoreNotInstalled == false)
-        {
-            return;
-        }
-        $this->fireEvent('extension.register', [$this]);
-        if ( $this->handles('config') )
-        {
-            Config::package($this->getSlug(), head($this->getPath('config')), $this->getSlug());
-            Config::addPublisher($this->getSlug(), head($this->getPath('config')));
-        }
-
-        $this->callAttributesClosure('register');
-        $this->fireEvent('extension.registered', [$this]);
-    }
-
-    public function boot()
-    {
-        if ( ! $this->isInstalled() )
-        {
-            return;
-        }
-        $this->fireEvent('extension.booting', [$this]);
-        if ( $this->handles('theme') )
-        {
-            Themes::addPackagePublisher($this->getSlug(), head($this->getPath('theme')));
-        }
-        $this->callAttributesClosure('boot');
-        $this->fireEvent('extension.booted', [$this]);
-    }
-
-    protected function callAttributesClosure($name)
-    {
-        #Debugger::dump(['extension' => $this->getSlug(), 'func' => 'callAttributesClosure', 'name' => $name, 'closure' => $this->attributes[$name], 'is_closure' => $this->attributes[$name] instanceof Closure]);
-        if ( isset($this->attributes[$name]) and $this->attributes[$name] instanceof \Closure )
-        {
-            $this->attributes[$name]($this->extensions->getApplication(), $this, $this->extensions);
-        }
-    }
-
-    public function handles($handle)
-    {
-        if ( ! in_array($handle, $this['handles']) or $this["handles.${handle}"] !== true )
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Ensures the class contains the database record information (ex, installed, id, etc)
-     * If not, it will re-queue the database and make sure the class will have it.
-     *
-     * @throws \ErrorException
-     * @todo this might cause an maximum stack exception because it can call itself indefinitly. Fix it
-     */
-    public function ensureRecord()
-    {
-        if ( isset($this->record) )
-        {
-            return;
-        }
-
-        if ( ! $this->record = $this->extensions->dbGetBySlug($this->slug) )
-        {
-            if ( ! $this->extensions->dbCreate($this->slug) )
-            {
-                throw new \ErrorException("Could not ensure record for [{$this->getSlug()}]");
-            }
-            #$this->record = $this->extensions->dbGetBySlug($this->slug);
-            $this->ensureRecord();
-        }
-    }
-
-    /**
-     * Refresh the database record information in the class (ex, installed, id, etc)
-     *
-     * @return $this
-     */
-    public function updateRecord()
-    {
-        $this->record = $this->extensions->dbGetBySlug($this->slug);
-        return $this;
-    }
-
-
-    //
-    /* Getters / Setters */
-    //
-
-    public function getDependants()
-    {
-        $deps = [];
-        foreach ($this->extensions->all() as $e)
-        {
-            if ( in_array($this->slug, $e->getDependencies()) )
-            {
-                $deps[] = $e->getSlug();
-            }
-        }
-
-        return $deps;
-    }
-
-    public function getInstalledDependants()
-    {
-        $installedDeps = [];
-        foreach ($this->getDependants() as $dep)
-        {
-            $ex = $this->extensions->get($dep);
-            if ( $ex->isInstalled() )
-            {
-                $installedDeps[] = $ex->getSlug();
-            }
-        }
-
-        return $installedDeps;
-    }
-
-    /**
-     * Get the value of path
-     *
-     * @return mixed
-     */
-    public function getPath($path = null)
-    {
-        if ( is_null($path) )
-        {
-            return realpath($this->path);
-        }
-        else
-        {
-            $paths = $this["paths.$path"];
-            if ( ! is_array($paths) )
-            {
-                $paths = [$paths];
-            }
-
-            $basePath = $this->path;
-            foreach ($paths as $i => $p)
-            {
-                #Debugger::dump(compact('i', 'p'));
-                if ( Path::isRelative($p) )
-                {
-                    #Debugger::dump('is relative : ' . realpath(Path::join($this->path, $p)));
-                    $paths[$i] = realpath(Path::join($this->path, $p));
-                }
-                else
-                {
-                    #Debugger::dump('is NOT relative');
-                    $paths[$i] = realpath($p);
-                }
-            }
-
-            #Debugger::dump(compact('basePath', 'paths', 'path'));
-            # VarDumper::dump($this["paths.$path"]);
-
-            return $paths;
-        }
-    }
-
-    /**
-     * Sets the value of path
-     *
-     * @param string $path
-     * @return $this
-     */
-    public function setPath($path)
-    {
-        $this->path = $path;
-
-        return $this;
-    }
-
-    /**
-     * getDefaultAttributes
-     *
-     * @return mixed
-     */
-    public function getDefaultAttributes()
-    {
-        return Config::get('laradic/extensions::defaultExtensionAttributes');
-    }
-
-    /**
-     * Get the value of extensions
-     *
-     * @return \Laradic\Extensions\ExtensionFactory
-     */
-    public function getExtensions()
-    {
-        return $this->extensions;
-    }
-
-    /**
-     * Get the value of slug
-     *
-     * @return mixed
-     */
     public function getSlug()
     {
-        return $this->slug;
+        return $this[ 'slug' ];
+    }
+
+    public function getName()
+    {
+        return $this[ 'name' ];
+    }
+
+    public function getPath()
+    {
+        return $this[ 'path' ];
     }
 
     /**
-     * Get the value of dependencies
+     * get item key/identifier
      *
-     * @return mixed
+     * @return string|mixed
      */
+    public function getHandle()
+    {
+        return $this->getSlug();
+    }
+
     public function getDependencies()
     {
         return $this->dependencies;
     }
 
-    /**
-     * Get the value of name
-     *
-     * @return mixed
-     */
-    public function getName()
+    public function getVersion()
     {
-        return $this->name;
+        return new version($this->version);
     }
 
     /**
-     * Get the value of properties
+     * @var array
+     */
+    protected $dependencies = [ ];
+
+    protected $version;
+
+    /**
+     * @var array
+     */
+    protected $migrations = [ ];
+
+    /**
+     * @var array
+     */
+    protected $configurations = [ ];
+
+    /**
+     * @var array
+     */
+    protected $seeds = [ ];
+
+    /**
+     * Path to resources folder, relative to $dir
+     *
+     * @var string
+     */
+    protected $resourcesPath = '../resources';
+
+    /**
+     * @var array
+     */
+    protected $providers = [ ];
+
+    /**
+     * @var array
+     */
+    protected $aliases = [ ];
+
+    /**
+     * @var array
+     */
+    protected $middlewares = [ ];
+
+    /**
+     * @var array
+     */
+    protected $prependMiddlewares = [ ];
+
+    /**
+     * @var array
+     */
+    protected $routeMiddlewares = [ ];
+
+    /**
+     * @var array
+     */
+    protected $provides = [ ];
+
+
+    /**
+     * Boots the service provider.
+     *
+     * @return \Illuminate\Foundation\Application
+     */
+    public function boot()
+    {
+        /** @var \Illuminate\Foundation\Application $app */
+        $app = $this->app;
+
+        if ( isset($this->dir) and isset($this->configFiles) and is_array($this->configFiles) )
+        {
+            foreach ( $this->configFiles as $fileName )
+            {
+                $configPath = $this->dir . '/' . $this->resourcesPath . '/config/' . $fileName . '.php';
+                $this->publishes([ $configPath => config_path($fileName . '.php') ], 'config');
+            }
+        }
+
+        return $app;
+    }
+
+    /**
+     * Register the service provider.
+     *
+     * @return \Illuminate\Foundation\Application
+     * @final
+     */
+    public function register()
+    {
+
+        /** @var \Illuminate\Foundation\Application $app */
+        $app = $this->app;
+
+
+        $router = $app->make('router');
+        $kernel = $app->make('Illuminate\Contracts\Http\Kernel');
+
+        # CONFIG
+        if ( count($this->configurations) === 0 )
+        {
+            $this->addConfigComponent($this->getSlug(), $this->getSlug(), path_join($this->getPath(), 'resources/config'));
+        }
+        else
+        {
+            foreach ( $this->configurations as $ns => $path )
+            {
+                $this->addConfigComponent($ns, $ns, $path);
+            }
+        }
+
+        foreach ( $this->migrations as $path => $autoManage )
+        {
+            if ( $autoManage === false )
+            {
+                $this->publishes([ $path => base_path('/database/migrations') ], 'migrations');
+            }
+        }
+
+        foreach ( $this->prependMiddlewares as $middleware )
+        {
+            $kernel->prependMiddleware($middleware);
+        }
+
+        foreach ( $this->middlewares as $middleware )
+        {
+            $kernel->pushMiddleware($middleware);
+        }
+
+        foreach ( $this->routeMiddlewares as $key => $middleware )
+        {
+            $router->middleware($key, $middleware);
+        }
+
+        foreach ( $this->providers as $provider )
+        {
+            $app->register($provider);
+        }
+
+        foreach ( $this->aliases as $alias => $full )
+        {
+            $this->alias($alias, $full);
+        }
+
+
+        return $app;
+    }
+
+    /**
+     * alias
+     *
+     * @param $name
+     * @param $fullyQualifiedName
+     */
+    protected function alias($name, $fullyQualifiedName)
+    {
+        AliasLoader::getInstance()->alias($name, $fullyQualifiedName);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function provides()
+    {
+        return $this->provides;
+    }
+
+
+    public function onInstall()
+    {
+    }
+
+    public function onInstalled()
+    {
+    }
+
+    public function onUninstall()
+    {
+    }
+
+    public function onUninstalled()
+    {
+    }
+
+
+    /**
+     * get attributes value
      *
      * @return array
      */
@@ -495,76 +295,134 @@ class Extension implements ExtensionContract, ArrayAccess
     }
 
     /**
-     * setAttributes
+     * get extensions value
      *
-     * @param array $attributes
-     * @return $this
+     * @return \Laradic\Extensions\ExtensionFactory
      */
-    public function setAttributes(array $attributes)
+    public function getExtensions()
     {
-        $this->attributes   = array_replace_recursive($this->getDefaultAttributes(), $attributes);
-        $this->slug         = $attributes['slug'];
-        $this->dependencies = $attributes['dependencies'];
-        $this->name         = $attributes['name'];
-
-        $this->ensureRecord();
-
-        return $this;
+        return $this->extensions;
     }
 
     /**
-     * Determine if an item exists at an offset.
+     * get files value
      *
-     * @param  mixed $key
-     * @return bool
-     */
-    public function offsetExists($key)
-    {
-        return array_has($this->attributes, $key);
-    }
-
-    /**
-     * Get an item at a given offset.
-     *
-     * @param  mixed $key
      * @return mixed
      */
-    public function offsetGet($key)
+    public function getFiles()
     {
-        return array_get($this->attributes, $key);
+        return $this->files;
     }
 
     /**
-     * Set the item at a given offset.
+     * get migrations value
      *
-     * @param  mixed $key
-     * @param  mixed $value
-     * @return void
+     * @return array
      */
-    public function offsetSet($key, $value)
+    public function getMigrations()
     {
-        if ( is_array($key) )
-        {
-            foreach ($key as $innerKey => $innerValue)
-            {
-                array_set($this->attributes, $innerKey, $innerValue);
-            }
-        }
-        else
-        {
-            array_set($this->attributes, $key, $value);
-        }
+        return $this->migrations;
     }
 
     /**
-     * Unset the item at a given offset.
+     * get configurations value
      *
-     * @param  string $key
-     * @return void
+     * @return array
      */
-    public function offsetUnset($key)
+    public function getConfigurations()
     {
-        array_set($this->attributes, $key, null);
+        return $this->configurations;
     }
+
+    /**
+     * get providers value
+     *
+     * @return array
+     */
+    public function getProviders()
+    {
+        return $this->providers;
+    }
+
+    /**
+     * get aliases value
+     *
+     * @return array
+     */
+    public function getAliases()
+    {
+        return $this->aliases;
+    }
+
+    /**
+     * get middlewares value
+     *
+     * @return array
+     */
+    public function getMiddlewares()
+    {
+        return $this->middlewares;
+    }
+
+    /**
+     * get prependMiddlewares value
+     *
+     * @return array
+     */
+    public function getPrependMiddlewares()
+    {
+        return $this->prependMiddlewares;
+    }
+
+    /**
+     * get routeMiddlewares value
+     *
+     * @return array
+     */
+    public function getRouteMiddlewares()
+    {
+        return $this->routeMiddlewares;
+    }
+
+    /**
+     * get provides value
+     *
+     * @return array
+     */
+    public function getProvides()
+    {
+        return $this->provides;
+    }
+
+    /**
+     * get publishes value
+     *
+     * @return array
+     */
+    public static function getPublishes()
+    {
+        return self::$publishes;
+    }
+
+    /**
+     * get publishGroups value
+     *
+     * @return array
+     */
+    public static function getPublishGroups()
+    {
+        return self::$publishGroups;
+    }
+
+    /**
+     * get seeds value
+     *
+     * @return array
+     */
+    public function getSeeds()
+    {
+        return $this->seeds;
+    }
+
 
 }

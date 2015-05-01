@@ -1,8 +1,9 @@
 <?php
- /**
+/**
  * Part of the Radic packages.
  */
 namespace Laradic\Extensions\Contracts;
+
 /**
  * Class Extension
  *
@@ -12,6 +13,13 @@ namespace Laradic\Extensions\Contracts;
  * @copyright   2011-2015, Robin Radic
  * @link        http://radic.mit-license.org
  */
-interface Extension {
+interface Extension
+{
 
+    /**
+     * Returns an array with slug, namespace, version and dependencies
+     *
+     * @return array
+     */
+    public static function getInfo();
 }

@@ -29,7 +29,8 @@ class ConsoleServiceProvider extends AggregateConsoleProvider
         'ListExtensions' => 'command.extensions.list',
         'InstallExtensions' => 'command.extensions.install',
         'UninstallExtensions' => 'command.extensions.uninstall',
-        'CreateExtension' => 'command.extensions.create'
+        'CreateExtension' => 'command.extensions.create',
+        'SearchExtensions' => 'command.extensions.search',
     ];
 
 

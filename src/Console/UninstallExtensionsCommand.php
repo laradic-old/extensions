@@ -4,8 +4,11 @@
  */
 namespace Laradic\Extensions\Console;
 
-use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
+use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Foundation\Bus\DispatchesCommands;
 use Laradic\Console\Command;
+use Laradic\Extensions\Commands\UninstallExtension;
+use Laradic\Extensions\Console\Traits\ExtensionCommandTrait;
 use Symfony\Component\Console\Input\InputArgument;
 
 /**
@@ -19,17 +22,27 @@ use Symfony\Component\Console\Input\InputArgument;
  */
 class UninstallExtensionsCommand extends Command
 {
-    use ExtensionCommandTrait;
+    use ExtensionCommandTrait, DispatchesCommands;
 
     protected $name = 'extensions:uninstall';
 
-    protected $description = 'List all extensions.';
+    protected $description = 'Uninstall one or multiple extensions';
+
+    protected $dispatcher;
+
+    public function __construct(Dispatcher $dispatcher)
+    {
+        parent::__construct();
+        $this->dispatcher = $dispatcher;
+        # $this->dump($dispatcher);
+    }
+
 
     public function fire()
     {
-        if(!$slug       = $this->argument('slug'))
+        if ( ! $slug = $this->argument('slug') )
         {
-            foreach($this->getExtensions()->getSortedByDependency()->reverse()->all() as $extension)
+            foreach ( $this->getExtensions()->getSortedByDependency()->reverse()->all() as $extension )
             {
                 //$extension->uninstall();
                 $this->call('extensions:uninstall', [
@@ -39,7 +52,18 @@ class UninstallExtensionsCommand extends Command
         }
         else
         {
-            $this->uninstall($slug);
+            $extension = $this->getExtensions()->get($slug);
+            if($extension->isInstalled())
+            {
+                $c = new UninstallExtension($extension);
+                $this->dispatch($c);
+                $this->info('Extension [' . $slug . '] uninstalled');
+                #$this->uninstall($slug);
+            }
+            else
+            {
+                $this->error('Could not uninstall extension. The extension is not installed.');
+            }
         }
     }
 
@@ -56,7 +80,6 @@ class UninstallExtensionsCommand extends Command
         {
             $extension->uninstall();
             $this->info("Extension [$slug] uninstalled");
-
         }
         else
         {
@@ -67,7 +90,7 @@ class UninstallExtensionsCommand extends Command
     public function getArguments()
     {
         return [
-            ['slug', InputArgument::OPTIONAL, 'The extension slug']
+            [ 'slug', InputArgument::OPTIONAL, 'The extension slug' ]
         ];
     }
 }
