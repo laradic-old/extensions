@@ -54,10 +54,11 @@ class InstallExtensionsCommand extends Command
             {
                 $c = new InstallExtension($this->getExtensions()->get($slug));
                 $this->dispatch($c);
+                return $this->info("Extension [$slug] installed");
             }
             else
             {
-                $this->error('Extension could not be installed, the extension was alreayd installed');
+                return $this->error('Extension could not be installed, the extension was alreayd installed');
             }
         }
     }

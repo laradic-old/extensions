@@ -20,7 +20,7 @@ use Laradic\Themes\Traits\ThemeProviderTrait;
 use vierbergenlars\SemVer\version;
 
 /**
- * This is the BaseExtension class.
+ * This is the abstract Extension class. All extensions should have a class in the root dir extending this class.
  *
  * @package        Laradic\Extensions
  * @version        1.0.0
@@ -51,6 +51,23 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
 
     protected $files;
 
+    /**
+     * get item key/identifier
+     *
+     * @return string|mixed
+     */
+    public function getHandle()
+    {
+        return $this['slug'];
+    }
+
+    /**
+     * Creates an instance of the extension
+     *
+     * @param \Illuminate\Foundation\Application   $app
+     * @param \Laradic\Extensions\ExtensionFactory $extensions
+     * @param array                                $attributes
+     */
     public function __construct(Application $app, ExtensionFactory $extensions, array $attributes)
     {
         parent::__construct($app);
@@ -59,6 +76,11 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
         $this->files      = $extensions->getFiles();
     }
 
+    /**
+     * Returns true if the extension is installed
+     *
+     * @return bool
+     */
     public function isInstalled()
     {
         return $this->extensions->isInstalled($this[ 'slug' ]);
@@ -79,16 +101,6 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
         return $this[ 'path' ];
     }
 
-    /**
-     * get item key/identifier
-     *
-     * @return string|mixed
-     */
-    public function getHandle()
-    {
-        return $this->getSlug();
-    }
-
     public function getDependencies()
     {
         return $this->dependencies;
@@ -107,12 +119,46 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
     protected $version;
 
     /**
+     * The (extra) migrations you want to include for auto-management or self-management
+     *
+     * By default, on install/uninstall the resources/migrations folder will be checked for migrations.
+     * If you want to disable the auto install/uninstall behaviour, you can set this to false.
+     *
+     * Optionally, if you want to specify optional migration folders you can add them in the array.
+     * If provided with true, those migrations will be auto installed/uninstalled.
+     * If provided false, those migrations will be made available by the vendor:publish command
+     *
      * @var array
+     * @example
+     *  protected $migrations = array(
+     *      "path/to/manualy/publish/and/migrate/migrations" => false,
+     *      "path/to/automaticly/managed/migrations" => true,
+     *  );
+     *
+     *  protected $migrations = false;
      */
     protected $migrations = [ ];
 
     /**
-     * @var array
+     * The (extra) configuration directories you want to include.
+     *
+     * The configuration makes use of the https://github.com/laradic/config package.
+     *
+     * These will be available directly inside your *Extension.php file and project source code.
+     * Each directory will be bound to a namespace like so:
+     *
+     * @var array|bool
+     * @example
+     *  protected $configurations = array(
+     *      "vendor/package" => __DIR__ . "/path/to/configurations/files",
+     *      "awesome/stuff" => __DIR__ . "/../path/to/other/configurations/files"
+     *  );
+     *
+     *  // Disable handling configuration
+     *  protected $configurations = false;
+     *
+     *  // Then in your code you can access it like
+     *  echo Config::get("awesome/stuff::dot.notated.key");
      */
     protected $configurations = [ ];
 
@@ -122,11 +168,31 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
     protected $seeds = [ ];
 
     /**
+     * The (extra) migration directories you want to include for auto-management or self-management
+     *
+     * Setting this to false, will disable automatic theme registration.
+     * Otherwise, the extension will automaticly register (if exists) the theme located at
+     * resources/theme and bind it to "vendor/package" aka the extensions slug.
+     *
+     * Optionally, you can define other locations and namespaces.
+     *
+     * @var array|bool
+     * @example
+     *  protected $themes = array(
+     *      "vendor/package" => __DIR__ . "/path/to/theme/files",
+     *      "awesome/stuff" => __DIR__ . "/../path/to/other/theme/files"
+     *  );
+     *
+     *  protected $themes = false;
+     */
+    protected $themes = [ ];
+
+    /**
      * Path to resources folder, relative to $dir
      *
      * @var string
      */
-    protected $resourcesPath = '../resources';
+    protected $resourcesPath = 'resources';
 
     /**
      * @var array
@@ -169,12 +235,13 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
 
-        if ( isset($this->dir) and isset($this->configFiles) and is_array($this->configFiles) )
+        if(is_array($this->themes))
         {
-            foreach ( $this->configFiles as $fileName )
+            $this->addPackagePublisher($this->getSlug(), path_join($this->getPath(), $this->resourcesPath, 'theme'));
+
+            foreach ( $this->configurations as $ns => $path )
             {
-                $configPath = $this->dir . '/' . $this->resourcesPath . '/config/' . $fileName . '.php';
-                $this->publishes([ $configPath => config_path($fileName . '.php') ], 'config');
+                $this->addPackagePublisher($ns, $path);
             }
         }
 
@@ -198,23 +265,25 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
         $kernel = $app->make('Illuminate\Contracts\Http\Kernel');
 
         # CONFIG
-        if ( count($this->configurations) === 0 )
+        if(is_array($this->configurations))
         {
-            $this->addConfigComponent($this->getSlug(), $this->getSlug(), path_join($this->getPath(), 'resources/config'));
-        }
-        else
-        {
+            $this->addConfigComponent($this->getSlug(), $this->getSlug(), path_join($this->getPath(), $this->resourcesPath, 'config'));
+
             foreach ( $this->configurations as $ns => $path )
             {
                 $this->addConfigComponent($ns, $ns, $path);
             }
         }
 
-        foreach ( $this->migrations as $path => $autoManage )
+        # MIGRATIONs
+        if(is_array($this->migrations))
         {
-            if ( $autoManage === false )
+            foreach ( $this->migrations as $path => $autoManage )
             {
-                $this->publishes([ $path => base_path('/database/migrations') ], 'migrations');
+                if ( $autoManage === false )
+                {
+                    $this->publishes([ $path => base_path('/database/migrations') ], 'migrations');
+                }
             }
         }
 
@@ -422,6 +491,16 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
     public function getSeeds()
     {
         return $this->seeds;
+    }
+
+    /**
+     * get themes value
+     *
+     * @return array|bool
+     */
+    public function getThemes()
+    {
+        return $this->themes;
     }
 
 

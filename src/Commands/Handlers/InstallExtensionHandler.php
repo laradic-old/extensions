@@ -5,6 +5,7 @@ use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Queue\InteractsWithQueue;
 use Laradic\Extensions\Commands\InstallExtension;
 use Laradic\Extensions\Commands\UninstallExtension;
+use Laradic\Extensions\Events\ExtensionInstalled;
 use Laradic\Extensions\Traits\ExtensionDbRecordTrait;
 use Symfony\Component\VarDumper\VarDumper;
 
@@ -28,7 +29,7 @@ class InstallExtensionHandler extends Handler
         $app        = $this->app;
         $extensions = $this->extensions;
         $extension  = $command->extension;
-
+        $this->log->info("extensions.install starting [{$extension->getSlug()}] ");
         #$extension->register();
         $app->register($extension);
         $extension->onInstall();
@@ -54,11 +55,23 @@ class InstallExtensionHandler extends Handler
         $seedPaths = array_merge($extension->getSeeds(), [ path_join($extension->getPath(), 'resources/seeds') ]);
         $this->runSeeders($extension, $seedPaths);
 
+        // Publish theme
+        $themes = $app->make('themes');
+        $themePaths = $extension->getThemes();
+        if($themePaths !== false){
+            $publishers = $themes->getPublishers();
+            if(in_array($slug, array_keys($publishers)))
+            {
+                $themes->publish($slug);
+            }
+        }
 
         // Writeout
         $this->recordInstall($slug);
+
         event(new ExtensionInstalled($extension));
         $extension->onInstalled();
+        $this->log->info("extensions.install done [{$extension->getSlug()}] ");
     }
 
 }

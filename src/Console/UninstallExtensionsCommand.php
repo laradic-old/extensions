@@ -44,7 +44,6 @@ class UninstallExtensionsCommand extends Command
         {
             foreach ( $this->getExtensions()->getSortedByDependency()->reverse()->all() as $extension )
             {
-                //$extension->uninstall();
                 $this->call('extensions:uninstall', [
                     'slug' => $extension->getSlug()
                 ]);
@@ -58,7 +57,6 @@ class UninstallExtensionsCommand extends Command
                 $c = new UninstallExtension($extension);
                 $this->dispatch($c);
                 $this->info('Extension [' . $slug . '] uninstalled');
-                #$this->uninstall($slug);
             }
             else
             {
@@ -67,25 +65,6 @@ class UninstallExtensionsCommand extends Command
         }
     }
 
-    protected function uninstall($slug)
-    {
-        $extensions = $this->getExtensions();
-        $slug       = $this->argument('slug');
-        if ( ! $extensions->has($slug) )
-        {
-            return $this->error("Extension [$slug] does not exist");
-        }
-        $extension = $extensions->get($slug);
-        if ( $extension->isInstalled() )
-        {
-            $extension->uninstall();
-            $this->info("Extension [$slug] uninstalled");
-        }
-        else
-        {
-            $this->comment("Extension [$slug] not installed");
-        }
-    }
 
     public function getArguments()
     {

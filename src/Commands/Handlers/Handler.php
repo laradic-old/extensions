@@ -10,6 +10,9 @@ namespace Laradic\Extensions\Commands\Handlers;
 
 use Debugger;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Logging\Log;
+use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\Migrations\DatabaseMigrationRepository;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Database\QueryException;
 use Illuminate\Filesystem\Filesystem;
@@ -44,22 +47,28 @@ class Handler
 
     protected $connection;
 
+    protected $files;
+
+    protected $db;
+
     /**
      * Create the command handler.
      *
      * @param \Illuminate\Contracts\Foundation\Application         $app
      * @param \Extensions|\Laradic\Extensions\Contracts\Extensions $extensions
      */
-    public function __construct(Application $app, Extensions $extensions)
+    public function __construct(Application $app, Extensions $extensions, Filesystem $files, DatabaseManager $db, Log $log)
     {
         /** @var \Illuminate\Foundation\Application $app */
         $this->app        = $app;
         $this->extensions = $extensions;
-        $this->connection = $app->make('db')->connection();
-
-        $this->migrator = $migrator = $app->make('migrator');
+        $this->files      = $files;
+        $this->db         = $db;
+        $this->connection = $db->connection();
+        $this->files      = $files;
+        $this->migrator   = $migrator = $app->make('migrator');
+        $this->log        = $log;
         $migrator->setConnection($this->connection->getName());
-        $this->files = $app->make('files');
     }
 
 
@@ -72,6 +81,14 @@ class Handler
      */
     protected function runMigrations(Extension $extension, $paths, $way = 'up')
     {
+        $this->log->info("extensions.migration [$way] starting [{$extension->getSlug()}] ");
+        if ( $extension->getMigrations() === false )
+        {
+            // The extension doesnt want me to handle migrations, skip it
+            $this->log->info("extensions.migration [$way] SKIPPING [{$extension->getSlug()}] ");
+            return;
+        }
+
         $migrator = $this->migrator;
         $files    = $this->files;
         if ( ! isset($paths) or ! is_array($paths) )
@@ -105,10 +122,12 @@ class Handler
                 {
                     if ( $way === 'up' )
                     {
+                        $this->log->info("extensions.migration $way -> [{$extension->getSlug()}] migrating [$migrationFile]");
                         $migration->up();
                     }
                     elseif ( $way === 'down' )
                     {
+                        $this->log->info("extensions.migration $way -> [{$extension->getSlug()}] migrating [$migrationFile]");
                         $migration->down();
                     }
                 }
@@ -127,6 +146,14 @@ class Handler
 
     protected function runSeeders(Extension $extension, array $paths = [ ])
     {
+        $this->log->info("extensions.seeding starting [{$extension->getSlug()}]");
+        if ( $extension->getSeeds() === false )
+        {
+            // The extension doesnt want me to handle seeds, skip it
+            $this->log->info("extensions.seeding skipping [{$extension->getSlug()}]");
+            return;
+        }
+
         if ( ! isset($paths) or ! is_array($paths) )
         {
             return;
@@ -144,12 +171,14 @@ class Handler
 
             foreach ( $seederFiles as $file )
             {
+                $this->log->info("extensions.seeding [{$extension->getSlug()}] [$file]");
                 $this->runSeed($file);
             }
         }
 
         foreach ( $extension->getSeeds() as $seedFilePath => $seedClassName )
         {
+            $this->log->info("extensions.seeding [{$extension->getSlug()}] [$seedFilePath]");
             $this->runSeed(
                 is_int($seedFilePath) ? $seedClassName : $seedFilePath,
                 is_int($seedFilePath) ? null : $seedClassName
@@ -160,6 +189,7 @@ class Handler
 
     protected function runSeed($filePath, $className = null)
     {
+
         $seeder = $this->app->make('seeder');
         $this->files->requireOnce($filePath);
         $className = isset($className) ? $className : Path::getFilenameWithoutExtension($filePath);

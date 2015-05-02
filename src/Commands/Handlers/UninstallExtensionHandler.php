@@ -28,7 +28,7 @@ class UninstallExtensionHandler extends Handler
         $app        = $this->app;
         $extensions = $this->extensions;
         $extension  = $command->extension;
-
+        $this->log->info("extensions.uninstall starting [{$extension->getSlug()}] ");
         #$extension->register();
         $app->register($extension);
         $extension->onUninstall();
@@ -55,6 +55,7 @@ class UninstallExtensionHandler extends Handler
         $this->recordUninstall($slug);
         event(new ExtensionUninstalled($extension));
         $extension->onInstalled();
+        $this->log->info("extensions.uninstall done [{$extension->getSlug()}] ");
     }
 
 }

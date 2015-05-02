@@ -43,15 +43,6 @@ trait ExtensionDbRecordTrait
         return $connection->table(Config::get('laradic/extensions::table'));
     }
 
-    public function updateRecords()
-    {
-        $this->records = [ ];
-        foreach ( $this->query()->get() as $record )
-        {
-            $this->records[ $record->slug ] = (int)$record->installed;
-        }
-    }
-
     protected function getRecord($slug)
     {
         return $this->query()->where('slug', '=', $slug)->first();

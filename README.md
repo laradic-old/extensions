@@ -23,7 +23,7 @@ Config::getLoader()->set('laradic/admin:config.key', 'value');
 Check [laradic/admin](https://github.com/laradic/admin) or [laradic/docit](https://github.com/laradic/docit) for a working implementation.
   
 ###### Directory structure
-```js
+```xml
 - app
 - bootstrap
 - extensions

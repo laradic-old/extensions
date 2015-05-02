@@ -102,6 +102,7 @@ class ExtensionsServiceProvider extends ServiceProvider
         $app->bind('Laradic\Extensions\Contracts\Extensions', 'extensions');
         $this->alias('Extensions', 'Laradic\Extensions\Facades\Extensions');
         $app->make('extensions')->findAndRegisterAll();
+        $app->make('events')->subscribe('extensions');
     }
 
     protected function registerGenerator()

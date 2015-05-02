@@ -75,10 +75,32 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
         return $this->extensions;
     }
 
-    public function on($eventName, \Closure $cb)
+    /**
+     * @var array
+     */
+    protected $records;
+
+    public function updateRecords()
     {
-        $this->registerEvent($eventName, $cb);
+        $this->records = [ ];
+        foreach ( $this->query()->get() as $record )
+        {
+            $this->records[ $record->slug ] = (int)$record->installed;
+        }
     }
+
+    /**
+     * Register the listeners for the subscriber.
+     *
+     * @param  \Illuminate\Events\Dispatcher  $events
+     * @return array
+     */
+    public function subscribe($events)
+    {
+        $events->listen('Laradic\Extensions\Events\ExtensionInstalled', 'extensions@updateRecords');
+        $events->listen('Laradic\Extensions\Events\ExtensionUninstalled', 'extensions@updateRecords');
+    }
+
 
     /**
      * @var \Laradic\Support\Filesystem
@@ -99,10 +121,6 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
      */
     protected $resolver;
 
-    /**
-     * @var array
-     */
-    protected $records;
 
     /**
      * @var mixed
@@ -129,6 +147,7 @@ class ExtensionFactory implements ArrayAccess, ExtensionsContract
         $this->files      = $app->make('files');
         $this->extensions = [ ];
         $this->records    = [ ];
+
     }
 
 
