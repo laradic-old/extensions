@@ -235,7 +235,7 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
 
-        if(is_array($this->themes) and class_exists('Laradic\Themes\ThemeServiceProvider') and $app->isShared('theme'))
+        if(is_array($this->themes) and class_exists('Laradic\Themes\ThemeServiceProvider') and $app->bound('themes'))
         {
             $themes = $app->make('themes');
             $themes->addPackagePublisher($this->getSlug(), Path::join($this->getPath(), $this->resourcesPath, 'theme'));
