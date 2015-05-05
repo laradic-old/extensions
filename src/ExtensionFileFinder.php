@@ -69,7 +69,7 @@ class ExtensionFileFinder
                 else
                 {
                     // $attributes[ 'namespace' ] = String::namespacedStudly($attributes['slug']);
-                    $info[ 'path' ]           = path_get_directory($filePath);
+                    $info[ 'path' ]           = Path::getDirectory($filePath);
                     $info[ 'class' ]          = $classPath;
                     $found[ $info[ 'slug' ] ] = $info;
                 }

@@ -7,6 +7,7 @@ use Laradic\Extensions\Commands\InstallExtension;
 use Laradic\Extensions\Commands\UninstallExtension;
 use Laradic\Extensions\Events\ExtensionInstalled;
 use Laradic\Extensions\Traits\ExtensionDbRecordTrait;
+use Laradic\Support\Path;
 use Symfony\Component\VarDumper\VarDumper;
 
 /**
@@ -48,21 +49,25 @@ class InstallExtensionHandler extends Handler
         }
 
         // Migrations
-        $paths = array_merge($extension->getMigrations(), [ path_join($extension->getPath(), 'resources/migrations') ]);
+        $paths = array_merge($extension->getMigrations(), [ Path::join($extension->getPath(), 'resources/migrations') ]);
         $this->runMigrations($extension, $paths, 'up');
         $this->connection = app('db')->connection();
 
-        $seedPaths = array_merge($extension->getSeeds(), [ path_join($extension->getPath(), 'resources/seeds') ]);
+        $seedPaths = array_merge($extension->getSeeds(), [ Path::join($extension->getPath(), 'resources/seeds') ]);
         $this->runSeeders($extension, $seedPaths);
 
         // Publish theme
-        $themes = $app->make('themes');
-        $themePaths = $extension->getThemes();
-        if($themePaths !== false){
-            $publishers = $themes->getPublishers();
-            if(in_array($slug, array_keys($publishers)))
+        if(class_exists('Laradic\Themes\ThemeServiceProvider') and $app->isShared('theme'))
+        {
+            $themes     = $app->make('themes');
+            $themePaths = $extension->getThemes();
+            if ( $themePaths !== false )
             {
-                $themes->publish($slug);
+                $publishers = $themes->getPublishers();
+                if ( in_array($slug, array_keys($publishers)) )
+                {
+                    $themes->publish($slug);
+                }
             }
         }
 

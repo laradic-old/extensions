@@ -13,10 +13,10 @@ use Illuminate\Foundation\Application;
 use Laradic\Config\Traits\ConfigProviderTrait;
 use Laradic\Extensions\Contracts\Extension as ExtensionContract;
 use Laradic\Support\Contracts\Dependable;
+use Laradic\Support\Path;
 use Laradic\Support\ServiceProvider;
 use Laradic\Support\Traits\DotArrayAccess;
 use Laradic\Support\Traits\DotArrayObjectAccess;
-use Laradic\Themes\Traits\ThemeProviderTrait;
 use vierbergenlars\SemVer\version;
 
 /**
@@ -32,7 +32,7 @@ use vierbergenlars\SemVer\version;
 abstract class Extension extends ServiceProvider implements ExtensionContract, ArrayAccess, Dependable
 {
     use DotArrayAccess, DotArrayObjectAccess,
-        ConfigProviderTrait, ThemeProviderTrait;
+        ConfigProviderTrait;
 
 
     /**
@@ -235,13 +235,14 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
 
-        if(is_array($this->themes))
+        if(is_array($this->themes) and class_exists('Laradic\Themes\ThemeServiceProvider') and $app->isShared('theme'))
         {
-            $this->addPackagePublisher($this->getSlug(), path_join($this->getPath(), $this->resourcesPath, 'theme'));
+            $themes = $app->make('themes');
+            $themes->addPackagePublisher($this->getSlug(), Path::join($this->getPath(), $this->resourcesPath, 'theme'));
 
             foreach ( $this->configurations as $ns => $path )
             {
-                $this->addPackagePublisher($ns, $path);
+                $themes->addPackagePublisher($ns, $path);
             }
         }
 
@@ -267,8 +268,11 @@ abstract class Extension extends ServiceProvider implements ExtensionContract, A
         # CONFIG
         if(is_array($this->configurations))
         {
-            $this->addConfigComponent($this->getSlug(), $this->getSlug(), path_join($this->getPath(), $this->resourcesPath, 'config'));
-
+            $defaultConfigPath = Path::join($this->getPath(), $this->resourcesPath, 'config');
+            if($this->files->exists($defaultConfigPath))
+            {
+                $this->addConfigComponent($this->getSlug(), $this->getSlug(), $defaultConfigPath);
+            }
             foreach ( $this->configurations as $ns => $path )
             {
                 $this->addConfigComponent($ns, $ns, $path);

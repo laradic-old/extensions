@@ -6,8 +6,9 @@
  * in the LICENSE file or visit http://radic.mit-license.com
  */
 namespace Laradic\Extensions\Exceptions;
+
 use Exception;
-use FileNotFoundException;
+
 /**
  * This is the ExtensionNotFoundException.
  *
@@ -18,7 +19,7 @@ use FileNotFoundException;
  * @copyright      2015, Robin Radic
  * @link           https://github.com/robinradic
  */
-class ExtensionNotFoundException extends FileNotFoundException
+class ExtensionNotFoundException extends Exception
 {
     public function __construct($slug, $code = 0, Exception $previous = null)
     {

@@ -167,7 +167,7 @@ class Handler
                 continue;
             }
 
-            $seederFiles = $this->files->glob(path_join($path, '*Seeder.php'));
+            $seederFiles = $this->files->glob(Path::join($path, '*Seeder.php'));
 
             foreach ( $seederFiles as $file )
             {
@@ -204,11 +204,11 @@ class Handler
         {
             return $path;
         }
-        elseif ( path_is_relative($path) )
+        elseif ( Path::isRelative($path) )
         {
-            if ( $files->isDirectory(path_join($extension->getPath(), $path)) )
+            if ( $files->isDirectory(Path::join($extension->getPath(), $path)) )
             {
-                return path_join($extension->getPath(), $path);
+                return Path::join($extension->getPath(), $path);
             }
             elseif ( $files->isDirectory(base_path($path)) )
             {

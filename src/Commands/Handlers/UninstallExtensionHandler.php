@@ -6,6 +6,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Laradic\Extensions\Commands\UninstallExtension;
 use Laradic\Extensions\Events\ExtensionUninstalled;
 use Laradic\Extensions\Traits\ExtensionDbRecordTrait;
+use Laradic\Support\Path;
 use Symfony\Component\VarDumper\VarDumper;
 
 /**
@@ -47,7 +48,7 @@ class UninstallExtensionHandler extends Handler
         }
 
         // Migrations
-        $paths = array_merge($extension->getMigrations(), [ path_join($extension->getPath(), 'resources/migrations') ]);
+        $paths = array_merge($extension->getMigrations(), [ Path::join($extension->getPath(), 'resources/migrations') ]);
         $this->runMigrations($extension, $paths, 'down');
         $this->connection = app('db')->connection();
 
