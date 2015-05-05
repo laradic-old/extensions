@@ -1,6 +1,8 @@
 Laradic Laravel Extensions
 ===============================
 
+## Version 0.1
+
 Laravel extensions work like addons. By default it scans the `extensions` directory for package directories containing a `extension.php` file.
 An extension can depend on other extensions. 
   
@@ -39,52 +41,51 @@ Check [laradic/admin](https://github.com/laradic/admin) or [laradic/docit](https
             - src
                 - PackageServiceProvider.php
             - composer.json
-            - extension.php
+            - MyExtension.php
 - vendor
 ```
 
-###### extension.php
+###### MyExtension.php
 ```php
+namespace Vendor\My;
+
 use Illuminate\Contracts\Foundation\Application;
 use Laradic\Extensions\Extension;
 use Laradic\Extensions\ExtensionCollection;
-return array(
-    'name' => 'Package',
-    'slug' => 'vendor/package',
-    'dependencies' => [
-        'vendor/otherpackage'
-    ],
-    'paths' => [
-        'migrations' => [base_path('vendor/rydurham/sentinel/src/migrations')], // will get merged with the default config pointing to resources/migrations
-        #'seeds' => [base_path('vendor/rydurham/sentinel/src/seeds')]
-        #'config' => ['path'],
-        #'theme' => ['path']
-    ],
-    'handles' => [
-        // Enable/disable handling of resources
-        'migrations' => false, // ex: this extension will not migrate on install/uninstall
-        'seeds' => true,
-        'config' => true,
-        'theme' => true
-    ],
-    'seeds' => [
-        // will seed DatabaseSeeder.php on install, using SentinelDatabaseSeeder as classname
-        base_path('vendor/rydurham/sentinel/src/seeds/DatabaseSeeder.php') => 'SentinelDatabaseSeeder',
-         // will seed OtherSeeder.php on install, using OtherSeeder as classname, derived from filename
-        base_path('vendor/rydurham/sentinel/src/seeds/OtherSeeder.php') 
-    ],
-    'register' => function(Application $app, Extension $extension, ExtensionCollection $extensions){},
-    'boot' => function(Application $app, Extension $extension, ExtensionCollection $extensions)
+
+class MyExtension extends Extension
+{
+
+    protected $version = '1.0.0';
+
+    protected $dependencies = [
+        'vendor/extension1'
+    ];
+
+    protected $provides = [ ];
+
+    public static function getInfo()
     {
-        $app->register('Vendor\Package\PackageServiceProvider');
-    },
-    'pre_install' => function(Application $app, Extension $extension, ExtensionCollection $extensions){},
-    'install' => function(Application $app, Extension $extension, ExtensionCollection $extensions){},
-    'installed' => function(Application $app, Extension $extension, ExtensionCollection $extensions){},
-    'pre_uninstall' => function(Application $app, Extension $extension, ExtensionCollection $extensions){},
-    'uninstall' => function(Application $app, Extension $extension, ExtensionCollection $extensions){},
-    'uninstalled' => function(Application $app, Extension $extension, ExtensionCollection $extensions){},
-);
+        return [
+            'name'        => 'My Extension',
+            'slug'        => 'vendor/my',
+            'description' => 'A ext',
+            'author'      => 'me'
+        ];
+    }
+
+
+    public function boot()
+    {
+
+    }
+
+    public function register()
+    {
+
+    }
+
+}
 ```
   
 - `register` is always called
